@@ -1,0 +1,329 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   FocusTube — Options Page Styles
+   ═══════════════════════════════════════════════════════════════════════ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: #0a0814;
+  color: #ffffff;
+  min-height: 100vh;
+}
+
+.options {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+/* ─── Header ───────────────────────────────────────────────────────── */
+
+.options__header {
+  margin-bottom: 36px;
+}
+
+.options__logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+/* ─── Sections ─────────────────────────────────────────────────────── */
+
+.options__main {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.options__section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 16px;
+  padding: 24px;
+}
+
+.options__section-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.options__section-desc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+/* ─── Radio Cards ──────────────────────────────────────────────────── */
+
+.options__radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.options__radio {
+  display: flex;
+  cursor: pointer;
+}
+
+.options__radio input[type="radio"] {
+  display: none;
+}
+
+.options__radio-card {
+  flex: 1;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.options__radio-card strong {
+  display: block;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.options__radio-card span {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.options__radio input:checked + .options__radio-card {
+  border-color: rgba(167, 139, 250, 0.4);
+  background: rgba(167, 139, 250, 0.06);
+}
+
+.options__radio input:checked + .options__radio-card strong {
+  color: #a78bfa;
+}
+
+/* ─── Toggle Switches ──────────────────────────────────────────────── */
+
+.options__toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.options__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  cursor: pointer;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.8);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  position: relative;
+}
+
+.options__toggle:last-child {
+  border-bottom: none;
+}
+
+.options__toggle input[type="checkbox"] {
+  display: none;
+}
+
+.options__toggle-slider {
+  width: 42px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 99px;
+  position: relative;
+  transition: background 0.3s ease;
+  flex-shrink: 0;
+}
+
+.options__toggle-slider::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  top: 3px;
+  left: 3px;
+  transition: transform 0.3s ease;
+}
+
+.options__toggle input:checked + .options__toggle-slider {
+  background: #6C3CE1;
+}
+
+.options__toggle input:checked + .options__toggle-slider::after {
+  transform: translateX(18px);
+}
+
+/* ─── Pomodoro Presets ─────────────────────────────────────────────── */
+
+.options__pomodoro-presets {
+  display: flex;
+  gap: 10px;
+  opacity: 0.4;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.options__pomodoro-presets--active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.options__preset {
+  flex: 1;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  color: #ffffff;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.options__preset strong {
+  display: block;
+  font-size: 18px;
+  margin-bottom: 2px;
+}
+
+.options__preset span {
+  display: block;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.options__preset:hover {
+  border-color: rgba(167, 139, 250, 0.3);
+  transform: translateY(-1px);
+}
+
+.options__preset--active {
+  border-color: rgba(167, 139, 250, 0.5);
+  background: rgba(167, 139, 250, 0.08);
+}
+
+.options__preset--active strong {
+  color: #a78bfa;
+}
+
+/* ─── Inputs & Selects ─────────────────────────────────────────────── */
+
+.options__input {
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.options__input:focus {
+  border-color: rgba(167, 139, 250, 0.4);
+}
+
+.options__select-wrapper {
+  position: relative;
+}
+
+.options__select {
+  width: 100%;
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.options__select option {
+  background: #1a1a2e;
+  color: #ffffff;
+}
+
+.options__select--inline {
+  width: auto;
+  min-width: 140px;
+}
+
+.options__inline-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.options__inline-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+}
+
+/* ─── Actions ──────────────────────────────────────────────────────── */
+
+.options__actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 8px;
+}
+
+.options__btn {
+  padding: 14px 32px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.options__btn:hover {
+  transform: translateY(-1px);
+}
+
+.options__btn--save {
+  background: linear-gradient(135deg, #6C3CE1, #8B5CF6);
+  color: white;
+  box-shadow: 0 4px 16px rgba(108, 60, 225, 0.3);
+}
+
+.options__btn--save:hover {
+  box-shadow: 0 6px 24px rgba(108, 60, 225, 0.45);
+}
+
+.options__save-status {
+  font-size: 13px;
+  color: #10B981;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.options__save-status--visible {
+  opacity: 1;
+}

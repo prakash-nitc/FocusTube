@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FocusTube — Settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+  <div class="options">
+
+    <header class="options__header">
+      <div class="options__logo">
+        <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+          <defs>
+            <linearGradient id="opt-grad" x1="0" y1="0" x2="32" y2="32">
+              <stop offset="0%" stop-color="#6C3CE1"/>
+              <stop offset="100%" stop-color="#00B4D8"/>
+            </linearGradient>
+          </defs>
+          <rect rx="7" width="32" height="32" fill="url(#opt-grad)"/>
+          <polygon points="13,10 13,22 23,16" fill="white"/>
+        </svg>
+        <span>FocusTube Settings</span>
+      </div>
+    </header>
+
+    <main class="options__main">
+
+      <!-- Strictness -->
+      <section class="options__section">
+        <h2 class="options__section-title">Strictness Level</h2>
+        <p class="options__section-desc">Controls how aggressively FocusTube blocks distractions.</p>
+
+        <div class="options__radio-group">
+          <label class="options__radio">
+            <input type="radio" name="strictness" value="standard" id="strictness-standard" checked>
+            <div class="options__radio-card">
+              <strong>Standard</strong>
+              <span>Shows a confirmation modal when you click unrelated videos. You can choose to continue.</span>
+            </div>
+          </label>
+          <label class="options__radio">
+            <input type="radio" name="strictness" value="strict" id="strictness-strict">
+            <div class="options__radio-card">
+              <strong>Strict</strong>
+              <span>Blocks unrelated video navigation entirely. No "Continue Anyway" option.</span>
+            </div>
+          </label>
+        </div>
+      </section>
+
+      <!-- Hiding Options -->
+      <section class="options__section">
+        <h2 class="options__section-title">YouTube Clean Room</h2>
+        <p class="options__section-desc">Choose which YouTube elements to hide during study sessions.</p>
+
+        <div class="options__toggles">
+          <label class="options__toggle">
+            <span>Hide Sidebar</span>
+            <input type="checkbox" id="toggle-sidebar" checked>
+            <span class="options__toggle-slider"></span>
+          </label>
+          <label class="options__toggle">
+            <span>Hide Recommendations</span>
+            <input type="checkbox" id="toggle-recommendations" checked>
+            <span class="options__toggle-slider"></span>
+          </label>
+          <label class="options__toggle">
+            <span>Hide Shorts</span>
+            <input type="checkbox" id="toggle-shorts" checked>
+            <span class="options__toggle-slider"></span>
+          </label>
+          <label class="options__toggle">
+            <span>Hide Comments</span>
+            <input type="checkbox" id="toggle-comments" checked>
+            <span class="options__toggle-slider"></span>
+          </label>
+          <label class="options__toggle">
+            <span>Hide End Screen Cards</span>
+            <input type="checkbox" id="toggle-endcards" checked>
+            <span class="options__toggle-slider"></span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Pomodoro -->
+      <section class="options__section">
+        <h2 class="options__section-title">Pomodoro Mode</h2>
+        <p class="options__section-desc">Automatically cycle between study and break periods.</p>
+
+        <label class="options__toggle" style="margin-bottom: 16px;">
+          <span>Enable Pomodoro</span>
+          <input type="checkbox" id="toggle-pomodoro">
+          <span class="options__toggle-slider"></span>
+        </label>
+
+        <div class="options__pomodoro-presets" id="pomodoro-presets">
+          <button class="options__preset" data-preset="25/5">
+            <strong>25 / 5</strong>
+            <span>Classic</span>
+          </button>
+          <button class="options__preset" data-preset="50/10">
+            <strong>50 / 10</strong>
+            <span>Extended</span>
+          </button>
+          <button class="options__preset" data-preset="90/15">
+            <strong>90 / 15</strong>
+            <span>Deep Work</span>
+          </button>
+        </div>
+      </section>
+
+      <!-- Recovery Reminder -->
+      <section class="options__section">
+        <h2 class="options__section-title">Distraction Recovery</h2>
+        <p class="options__section-desc">How long before you get a reminder to return to your lecture.</p>
+
+        <div class="options__select-wrapper">
+          <select class="options__select" id="recovery-interval">
+            <option value="5">5 minutes</option>
+            <option value="10">10 minutes</option>
+            <option value="15" selected>15 minutes</option>
+            <option value="30">30 minutes</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Emergency Unlock Phrase -->
+      <section class="options__section">
+        <h2 class="options__section-title">Emergency Unlock</h2>
+        <p class="options__section-desc">Phrase you must type to temporarily unlock YouTube.</p>
+
+        <input
+          type="text"
+          class="options__input"
+          id="unlock-phrase"
+          value="I choose to pause my study session"
+        />
+
+        <div class="options__inline-field" style="margin-top: 12px;">
+          <label class="options__inline-label">Unlock duration:</label>
+          <select class="options__select options__select--inline" id="unlock-duration">
+            <option value="5">5 minutes</option>
+            <option value="10" selected>10 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+          </select>
+        </div>
+      </section>
+
+      <!-- Save Button -->
+      <div class="options__actions">
+        <button class="options__btn options__btn--save" id="save-btn">
+          Save Settings
+        </button>
+        <span class="options__save-status" id="save-status"></span>
+      </div>
+
+    </main>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
