@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=400">
+  <title>FocusTube — Study Mode</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup" id="popup">
+
+    <!-- Header -->
+    <header class="popup__header">
+      <div class="popup__logo">
+        <svg width="24" height="24" viewBox="0 0 32 32" fill="none">
+          <defs>
+            <linearGradient id="popup-grad" x1="0" y1="0" x2="32" y2="32">
+              <stop offset="0%" stop-color="#6C3CE1"/>
+              <stop offset="100%" stop-color="#00B4D8"/>
+            </linearGradient>
+          </defs>
+          <rect rx="7" width="32" height="32" fill="url(#popup-grad)"/>
+          <polygon points="13,10 13,22 23,16" fill="white"/>
+        </svg>
+        <span class="popup__logo-text">FocusTube</span>
+      </div>
+      <div class="popup__status" id="popup-status">
+        <span class="popup__status-dot" id="popup-status-dot"></span>
+        <span id="popup-status-text">Inactive</span>
+      </div>
+    </header>
+
+    <!-- Idle State (No active session) -->
+    <div class="popup__state" id="state-idle">
+
+      <div class="popup__idle-hero">
+        <div class="popup__idle-icon">
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+            <defs>
+              <linearGradient id="hero-grad" x1="0" y1="0" x2="48" y2="48">
+                <stop offset="0%" stop-color="#6C3CE1"/>
+                <stop offset="100%" stop-color="#00B4D8"/>
+              </linearGradient>
+            </defs>
+            <circle cx="24" cy="24" r="24" fill="url(#hero-grad)" opacity="0.12"/>
+            <polygon points="20,15 20,33 34,24" fill="url(#hero-grad)"/>
+          </svg>
+        </div>
+        <h2 class="popup__idle-title">Ready to Focus?</h2>
+        <p class="popup__idle-desc">Navigate to a YouTube lecture and start your study session.</p>
+      </div>
+
+      <div class="popup__start-form">
+        <div class="popup__field">
+          <label class="popup__label" for="goal-input">Session Goal <span class="popup__optional">(optional)</span></label>
+          <input type="text" class="popup__input" id="goal-input" placeholder="e.g., Finish React Hooks Tutorial" />
+        </div>
+        <button class="popup__btn popup__btn--start" id="start-session-btn">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+            <polygon points="4,2 4,14 14,8"/>
+          </svg>
+          Start Study Session
+        </button>
+        <p class="popup__hint" id="start-hint"></p>
+      </div>
+
+      <!-- Quick Stats -->
+      <div class="popup__quick-stats" id="quick-stats">
+        <h3 class="popup__section-title">Today</h3>
+        <div class="popup__stats-row">
+          <div class="popup__mini-stat">
+            <span class="popup__mini-stat-value" id="today-study">0m</span>
+            <span class="popup__mini-stat-label">Studied</span>
+          </div>
+          <div class="popup__mini-stat">
+            <span class="popup__mini-stat-value" id="today-score">—</span>
+            <span class="popup__mini-stat-label">Focus</span>
+          </div>
+          <div class="popup__mini-stat">
+            <span class="popup__mini-stat-value" id="today-distractions">0</span>
+            <span class="popup__mini-stat-label">Distractions</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Active Session State -->
+    <div class="popup__state popup__state--hidden" id="state-active">
+
+      <div class="popup__session-card">
+        <div class="popup__session-label">Now Studying</div>
+        <h2 class="popup__session-title" id="session-title">—</h2>
+        <div class="popup__session-goal" id="session-goal-wrapper">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 0a8 8 0 100 16A8 8 0 008 0zm3.5 6.2l-4 4a.7.7 0 01-1 0l-2-2a.7.7 0 011-1L7 8.7l3.5-3.5a.7.7 0 011 1z"/>
+          </svg>
+          <span id="session-goal">—</span>
+        </div>
+      </div>
+
+      <div class="popup__timer-card">
+        <div class="popup__timer" id="session-timer">00:00</div>
+        <div class="popup__timer-label" id="timer-label">Study Time</div>
+      </div>
+
+      <div class="popup__live-stats">
+        <div class="popup__live-stat">
+          <span class="popup__live-stat-value" id="live-focus-score">100%</span>
+          <span class="popup__live-stat-label">Focus</span>
+        </div>
+        <div class="popup__live-stat-divider"></div>
+        <div class="popup__live-stat">
+          <span class="popup__live-stat-value" id="live-distractions">0</span>
+          <span class="popup__live-stat-label">Distractions</span>
+        </div>
+        <div class="popup__live-stat-divider"></div>
+        <div class="popup__live-stat">
+          <span class="popup__live-stat-value" id="live-recovered">0</span>
+          <span class="popup__live-stat-label">Recovered</span>
+        </div>
+      </div>
+
+      <!-- Break info (shown during break) -->
+      <div class="popup__break-info popup__break-info--hidden" id="break-info">
+        <div class="popup__break-badge">☕ On Break</div>
+        <div class="popup__break-timer" id="break-timer">00:00</div>
+        <button class="popup__btn popup__btn--end-break" id="end-break-btn">End Break Early</button>
+      </div>
+
+      <div class="popup__session-actions">
+        <button class="popup__btn popup__btn--break" id="take-break-btn">
+          ☕ Take Break
+        </button>
+        <button class="popup__btn popup__btn--end" id="end-session-btn">
+          End Session
+        </button>
+      </div>
+
+      <!-- Break duration picker (hidden by default) -->
+      <div class="popup__break-picker popup__break-picker--hidden" id="break-picker">
+        <h3 class="popup__section-title">Break Duration</h3>
+        <div class="popup__break-options">
+          <button class="popup__break-option" data-minutes="5">5 min</button>
+          <button class="popup__break-option" data-minutes="10">10 min</button>
+          <button class="popup__break-option" data-minutes="15">15 min</button>
+        </div>
+      </div>
+
+      <button class="popup__btn popup__btn--emergency" id="emergency-btn">
+        🔓 Emergency Unlock
+      </button>
+
+    </div>
+
+    <!-- Footer -->
+    <footer class="popup__footer">
+      <button class="popup__footer-btn" id="open-dashboard-btn">📊 Dashboard</button>
+      <button class="popup__footer-btn" id="open-options-btn">⚙️ Settings</button>
+    </footer>
+
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

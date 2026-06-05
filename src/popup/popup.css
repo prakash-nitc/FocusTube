@@ -1,0 +1,516 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   FocusTube — Popup Styles
+   Premium dark UI with glassmorphism, gradients, and micro-animations.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  width: 380px;
+  min-height: 200px;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  background: #0f0a1e;
+  color: #ffffff;
+  overflow-x: hidden;
+}
+
+/* ─── Header ───────────────────────────────────────────────────────── */
+
+.popup__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.popup__logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.popup__logo-text {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.popup__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 5px 12px;
+  border-radius: 99px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.popup__status--active {
+  color: #a78bfa;
+  background: rgba(167, 139, 250, 0.08);
+  border-color: rgba(167, 139, 250, 0.15);
+}
+
+.popup__status--break {
+  color: #F59E0B;
+  background: rgba(245, 158, 11, 0.08);
+  border-color: rgba(245, 158, 11, 0.15);
+}
+
+.popup__status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.popup__status--active .popup__status-dot {
+  background: #a78bfa;
+  animation: popup-blink 1.5s ease-in-out infinite;
+}
+
+.popup__status--break .popup__status-dot {
+  background: #F59E0B;
+  animation: popup-blink 1.5s ease-in-out infinite;
+}
+
+@keyframes popup-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ─── States ───────────────────────────────────────────────────────── */
+
+.popup__state {
+  padding: 20px;
+}
+
+.popup__state--hidden {
+  display: none;
+}
+
+/* ─── Idle State ───────────────────────────────────────────────────── */
+
+.popup__idle-hero {
+  text-align: center;
+  padding: 12px 0 24px;
+}
+
+.popup__idle-icon {
+  margin-bottom: 12px;
+}
+
+.popup__idle-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.popup__idle-desc {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.45);
+  line-height: 1.4;
+}
+
+.popup__start-form {
+  margin-bottom: 20px;
+}
+
+.popup__field {
+  margin-bottom: 12px;
+}
+
+.popup__label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 6px;
+}
+
+.popup__optional {
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+.popup__input {
+  width: 100%;
+  padding: 11px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.popup__input:focus {
+  border-color: rgba(167, 139, 250, 0.4);
+}
+
+.popup__input::placeholder {
+  color: rgba(255, 255, 255, 0.2);
+}
+
+.popup__hint {
+  font-size: 11px;
+  color: #fca5a5;
+  margin-top: 8px;
+  min-height: 16px;
+}
+
+.popup__section-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.3);
+  margin-bottom: 10px;
+}
+
+/* Quick Stats */
+.popup__quick-stats {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 16px;
+}
+
+.popup__stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.popup__mini-stat {
+  text-align: center;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 10px;
+  padding: 12px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.popup__mini-stat-value {
+  display: block;
+  font-size: 18px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #a78bfa, #60a5fa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.popup__mini-stat-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.35);
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* ─── Active Session State ─────────────────────────────────────────── */
+
+.popup__session-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.popup__session-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.3);
+  margin-bottom: 6px;
+}
+
+.popup__session-title {
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+  margin-bottom: 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.popup__session-goal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.45);
+  margin-top: 6px;
+}
+
+.popup__session-goal svg {
+  color: #a78bfa;
+  flex-shrink: 0;
+}
+
+/* Timer */
+.popup__timer-card {
+  text-align: center;
+  margin-bottom: 14px;
+  padding: 12px;
+  background: rgba(108, 60, 225, 0.06);
+  border: 1px solid rgba(108, 60, 225, 0.1);
+  border-radius: 14px;
+}
+
+.popup__timer {
+  font-size: 42px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(135deg, #a78bfa, #60a5fa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: 2px;
+}
+
+.popup__timer-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+
+/* Live Stats */
+.popup__live-stats {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.popup__live-stat {
+  text-align: center;
+}
+
+.popup__live-stat-value {
+  display: block;
+  font-size: 18px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.popup__live-stat-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.35);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.popup__live-stat-divider {
+  width: 1px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Break Info */
+.popup__break-info {
+  text-align: center;
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.12);
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 14px;
+}
+
+.popup__break-info--hidden {
+  display: none;
+}
+
+.popup__break-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #F59E0B;
+  background: rgba(245, 158, 11, 0.12);
+  padding: 4px 12px;
+  border-radius: 99px;
+  margin-bottom: 8px;
+}
+
+.popup__break-timer {
+  font-size: 32px;
+  font-weight: 800;
+  color: #F59E0B;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ─── Buttons ──────────────────────────────────────────────────────── */
+
+.popup__btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.popup__btn:hover {
+  transform: translateY(-1px);
+}
+
+.popup__btn:active {
+  transform: translateY(0);
+}
+
+.popup__btn--start {
+  background: linear-gradient(135deg, #6C3CE1, #8B5CF6);
+  color: white;
+  box-shadow: 0 4px 16px rgba(108, 60, 225, 0.3);
+  font-size: 14px;
+  padding: 14px;
+}
+
+.popup__btn--start:hover {
+  box-shadow: 0 6px 24px rgba(108, 60, 225, 0.45);
+}
+
+.popup__btn--start:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.popup__session-actions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.popup__btn--break {
+  flex: 1;
+  background: rgba(245, 158, 11, 0.1);
+  color: #F59E0B;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.popup__btn--break:hover {
+  background: rgba(245, 158, 11, 0.18);
+}
+
+.popup__btn--end {
+  flex: 1;
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.12);
+}
+
+.popup__btn--end:hover {
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.popup__btn--end-break {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  margin-top: 10px;
+}
+
+.popup__btn--emergency {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 11px;
+  padding: 8px;
+}
+
+.popup__btn--emergency:hover {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Break Picker */
+.popup__break-picker {
+  margin-bottom: 14px;
+}
+
+.popup__break-picker--hidden {
+  display: none;
+}
+
+.popup__break-options {
+  display: flex;
+  gap: 8px;
+}
+
+.popup__break-option {
+  flex: 1;
+  padding: 14px 8px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.popup__break-option:hover {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.25);
+  color: #F59E0B;
+  transform: translateY(-1px);
+}
+
+/* ─── Footer ───────────────────────────────────────────────────────── */
+
+.popup__footer {
+  display: flex;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0;
+}
+
+.popup__footer-btn {
+  flex: 1;
+  padding: 12px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.popup__footer-btn:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.popup__footer-btn:first-child {
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}

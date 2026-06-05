@@ -1,0 +1,390 @@
+/**
+ * FocusTube — Popup Logic
+ * Manages popup state, session controls, timers, and stats display.
+ */
+
+(() => {
+  'use strict';
+
+  // ─── DOM Elements ──────────────────────────────────────────────────
+
+  const $  = (sel) => document.querySelector(sel);
+  const $$ = (sel) => document.querySelectorAll(sel);
+
+  const els = {
+    popup: $('#popup'),
+    statusBar: $('#popup-status'),
+    statusDot: $('#popup-status-dot'),
+    statusText: $('#popup-status-text'),
+
+    // States
+    stateIdle: $('#state-idle'),
+    stateActive: $('#state-active'),
+
+    // Idle
+    goalInput: $('#goal-input'),
+    startBtn: $('#start-session-btn'),
+    startHint: $('#start-hint'),
+    todayStudy: $('#today-study'),
+    todayScore: $('#today-score'),
+    todayDistractions: $('#today-distractions'),
+
+    // Active
+    sessionTitle: $('#session-title'),
+    sessionGoalWrapper: $('#session-goal-wrapper'),
+    sessionGoal: $('#session-goal'),
+    sessionTimer: $('#session-timer'),
+    timerLabel: $('#timer-label'),
+    liveFocusScore: $('#live-focus-score'),
+    liveDistractions: $('#live-distractions'),
+    liveRecovered: $('#live-recovered'),
+
+    // Break
+    breakInfo: $('#break-info'),
+    breakTimer: $('#break-timer'),
+    takeBreakBtn: $('#take-break-btn'),
+    endBreakBtn: $('#end-break-btn'),
+    breakPicker: $('#break-picker'),
+    breakOptions: $$('.popup__break-option'),
+    sessionActions: $('.popup__session-actions'),
+
+    // Session controls
+    endSessionBtn: $('#end-session-btn'),
+    emergencyBtn: $('#emergency-btn'),
+
+    // Footer
+    dashboardBtn: $('#open-dashboard-btn'),
+    optionsBtn: $('#open-options-btn'),
+  };
+
+  let timerInterval = null;
+  let breakTimerInterval = null;
+  let currentSession = null;
+
+  // ─── Initialization ───────────────────────────────────────────────
+
+  async function init() {
+    bindEvents();
+    await refreshState();
+  }
+
+  function bindEvents() {
+    els.startBtn.addEventListener('click', handleStartSession);
+    els.takeBreakBtn.addEventListener('click', handleTakeBreak);
+    els.endBreakBtn.addEventListener('click', handleEndBreak);
+    els.endSessionBtn.addEventListener('click', handleEndSession);
+    els.emergencyBtn.addEventListener('click', handleEmergencyUnlock);
+    els.dashboardBtn.addEventListener('click', handleOpenDashboard);
+    els.optionsBtn.addEventListener('click', handleOpenOptions);
+
+    els.breakOptions.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const minutes = parseInt(btn.dataset.minutes, 10);
+        handleStartBreak(minutes);
+      });
+    });
+  }
+
+  // ─── State Management ──────────────────────────────────────────────
+
+  async function refreshState() {
+    try {
+      const status = await sendMessage({ type: 'GET_STATUS' });
+
+      if (status?.active && status.session) {
+        currentSession = status.session;
+        showActiveState(status.session);
+      } else {
+        currentSession = null;
+        showIdleState();
+        await loadTodayStats();
+      }
+    } catch (e) {
+      console.error('[FocusTube Popup] Error getting status:', e);
+      showIdleState();
+    }
+  }
+
+  function showIdleState() {
+    els.stateIdle.classList.remove('popup__state--hidden');
+    els.stateActive.classList.add('popup__state--hidden');
+    els.statusBar.className = 'popup__status';
+    els.statusText.textContent = 'Inactive';
+    stopTimers();
+  }
+
+  function showActiveState(session) {
+    els.stateIdle.classList.add('popup__state--hidden');
+    els.stateActive.classList.remove('popup__state--hidden');
+
+    // Update session info
+    els.sessionTitle.textContent = session.lectureTitle || 'Untitled Lecture';
+
+    if (session.goal) {
+      els.sessionGoalWrapper.style.display = 'flex';
+      els.sessionGoal.textContent = session.goal;
+    } else {
+      els.sessionGoalWrapper.style.display = 'none';
+    }
+
+    // Update live stats
+    els.liveDistractions.textContent = session.distractionAttempts || 0;
+    els.liveRecovered.textContent = session.recoveredSessions || 0;
+
+    if (session.state === 'break') {
+      showBreakState(session);
+    } else {
+      showStudyingState(session);
+    }
+
+    startTimer(session);
+  }
+
+  function showStudyingState(session) {
+    els.statusBar.className = 'popup__status popup__status--active';
+    els.statusText.textContent = 'Studying';
+    els.breakInfo.classList.add('popup__break-info--hidden');
+    els.breakPicker.classList.add('popup__break-picker--hidden');
+    els.takeBreakBtn.style.display = '';
+    els.sessionActions.style.display = '';
+    els.timerLabel.textContent = 'Study Time';
+  }
+
+  function showBreakState(session) {
+    els.statusBar.className = 'popup__status popup__status--break';
+    els.statusText.textContent = 'On Break';
+    els.breakInfo.classList.remove('popup__break-info--hidden');
+    els.breakPicker.classList.add('popup__break-picker--hidden');
+    els.takeBreakBtn.style.display = 'none';
+    els.timerLabel.textContent = 'Total Study Time';
+
+    startBreakTimer(session);
+  }
+
+  // ─── Timer Updates ──────────────────────────────────────────────────
+
+  function startTimer(session) {
+    stopTimers();
+
+    updateTimer(session);
+    timerInterval = setInterval(() => updateTimer(session), 1000);
+  }
+
+  function updateTimer(session) {
+    let studyMs = session.totalStudyMs || 0;
+
+    if (session.state === 'active') {
+      studyMs += Date.now() - session.lastActiveTimestamp;
+    }
+
+    els.sessionTimer.textContent = formatTimer(studyMs);
+
+    // Update focus score
+    const totalMs = studyMs + (session.totalBreakMs || 0);
+    const score = totalMs > 0 ? Math.round((studyMs / totalMs) * 100) : 100;
+    els.liveFocusScore.textContent = score + '%';
+  }
+
+  function startBreakTimer(session) {
+    clearInterval(breakTimerInterval);
+
+    const updateBreak = () => {
+      if (!session.breakEndTime) return;
+      const remaining = Math.max(0, session.breakEndTime - Date.now());
+      els.breakTimer.textContent = formatTimer(remaining);
+
+      if (remaining <= 0) {
+        clearInterval(breakTimerInterval);
+        refreshState();
+      }
+    };
+
+    updateBreak();
+    breakTimerInterval = setInterval(updateBreak, 1000);
+  }
+
+  function stopTimers() {
+    clearInterval(timerInterval);
+    clearInterval(breakTimerInterval);
+    timerInterval = null;
+    breakTimerInterval = null;
+  }
+
+  // ─── Event Handlers ────────────────────────────────────────────────
+
+  async function handleStartSession() {
+    els.startHint.textContent = '';
+
+    // Get current tab
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    if (!tab?.url || !tab.url.includes('youtube.com/watch')) {
+      els.startHint.textContent = 'Please navigate to a YouTube video first.';
+      return;
+    }
+
+    const goal = els.goalInput.value.trim();
+    const lectureTitle = tab.title?.replace(' - YouTube', '').trim() || 'Untitled Lecture';
+
+    // Extract keywords from title
+    const keywords = extractKeywords(lectureTitle);
+
+    const response = await sendMessage({
+      type: 'START_SESSION',
+      data: {
+        lectureTitle,
+        lectureUrl: tab.url,
+        goal,
+        keywords,
+      },
+    });
+
+    if (response?.error) {
+      els.startHint.textContent = response.error;
+    } else {
+      await refreshState();
+    }
+  }
+
+  function handleTakeBreak() {
+    const picker = els.breakPicker;
+    if (picker.classList.contains('popup__break-picker--hidden')) {
+      picker.classList.remove('popup__break-picker--hidden');
+    } else {
+      picker.classList.add('popup__break-picker--hidden');
+    }
+  }
+
+  async function handleStartBreak(minutes) {
+    els.breakPicker.classList.add('popup__break-picker--hidden');
+
+    const response = await sendMessage({
+      type: 'START_BREAK',
+      data: { minutes },
+    });
+
+    if (response?.session) {
+      currentSession = response.session;
+      showActiveState(response.session);
+    }
+  }
+
+  async function handleEndBreak() {
+    const response = await sendMessage({ type: 'END_BREAK' });
+    if (response?.session) {
+      currentSession = response.session;
+      showActiveState(response.session);
+    }
+  }
+
+  async function handleEndSession() {
+    const goalCompleted = currentSession?.goal
+      ? confirm(`Did you complete your goal?\n\n"${currentSession.goal}"`)
+      : false;
+
+    const response = await sendMessage({
+      type: 'END_SESSION',
+      data: { goalCompleted },
+    });
+
+    if (response?.success) {
+      await refreshState();
+    }
+  }
+
+  async function handleEmergencyUnlock() {
+    const phrase = prompt(
+      'Type the following to unlock:\n\n"I choose to pause my study session"'
+    );
+
+    if (phrase?.trim().toLowerCase() === 'i choose to pause my study session') {
+      await sendMessage({ type: 'EMERGENCY_UNLOCK' });
+      await refreshState();
+    }
+  }
+
+  function handleOpenDashboard() {
+    sendMessage({ type: 'OPEN_DASHBOARD' });
+    window.close();
+  }
+
+  function handleOpenOptions() {
+    chrome.runtime.openOptionsPage();
+    window.close();
+  }
+
+  // ─── Today's Stats ─────────────────────────────────────────────────
+
+  async function loadTodayStats() {
+    try {
+      const stats = await sendMessage({ type: 'GET_DAILY_STATS' });
+      if (stats) {
+        els.todayStudy.textContent = formatDuration(stats.totalStudyMs || 0);
+        els.todayDistractions.textContent = stats.distractionAttempts || 0;
+
+        const totalMs = (stats.totalStudyMs || 0) + (stats.totalBreakMs || 0);
+        if (totalMs > 0) {
+          const score = Math.round(((stats.totalStudyMs || 0) / totalMs) * 100);
+          els.todayScore.textContent = score + '%';
+        } else {
+          els.todayScore.textContent = '—';
+        }
+      }
+    } catch (e) {
+      // Stats not available
+    }
+  }
+
+  // ─── Utilities ─────────────────────────────────────────────────────
+
+  function sendMessage(message) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage(message, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+        } else {
+          resolve(response);
+        }
+      });
+    });
+  }
+
+  function formatTimer(ms) {
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    const pad = n => String(n).padStart(2, '0');
+    if (hours > 0) return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    return `${pad(minutes)}:${pad(seconds)}`;
+  }
+
+  function formatDuration(ms) {
+    if (!ms || ms < 0) return '0m';
+    const totalSeconds = Math.floor(ms / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  }
+
+  function extractKeywords(text) {
+    if (!text) return [];
+    const stopWords = new Set([
+      'a','an','the','and','or','but','in','on','at','to','for','of','with',
+      'by','from','is','it','this','that','are','was','video','tutorial',
+      'lecture','part','full','course','class','lesson','hindi','english',
+      'explained','learn','guide','tips','tricks','how','easy','simple',
+      'best','top','new','latest','updated','2024','2025','2026',
+    ]);
+    return text.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 1 && !stopWords.has(w));
+  }
+
+  // ─── Start ─────────────────────────────────────────────────────────
+
+  init();
+
+})();
