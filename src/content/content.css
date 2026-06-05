@@ -1,0 +1,659 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   FocusTube — Content Styles
+   CSS injected into YouTube pages. Hides distracting elements when
+   study mode is active, and styles the overlay/modal components.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ─── YouTube Element Hiding (only when .focustube-active) ──────────── */
+
+body.focustube-active #guide {
+  display: none !important;
+}
+
+body.focustube-active #guide-button {
+  display: none !important;
+}
+
+body.focustube-active ytd-mini-guide-renderer {
+  display: none !important;
+}
+
+body.focustube-active #secondary {
+  display: none !important;
+}
+
+body.focustube-active #related {
+  display: none !important;
+}
+
+body.focustube-active ytd-reel-shelf-renderer {
+  display: none !important;
+}
+
+body.focustube-active ytd-rich-shelf-renderer[is-shorts] {
+  display: none !important;
+}
+
+body.focustube-active #comments {
+  display: none !important;
+}
+
+body.focustube-active .ytp-ce-element {
+  display: none !important;
+}
+
+body.focustube-active #chip-bar {
+  display: none !important;
+}
+
+/* Expand video player to full width when sidebar is hidden */
+body.focustube-active #primary {
+  max-width: 100% !important;
+}
+
+body.focustube-active ytd-watch-flexy:not([fullscreen]) #player-theater-container {
+  max-width: 100% !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   OVERLAY STYLES — Focus overlay replacing homepage/restricted pages
+   ═══════════════════════════════════════════════════════════════════════ */
+
+#focustube-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 99999;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#focustube-overlay.focustube-overlay--visible {
+  opacity: 1;
+}
+
+.focustube-overlay__backdrop {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, #0f0a1e 0%, #1a1035 30%, #0d1b2a 70%, #0a0f1e 100%);
+}
+
+.focustube-overlay__backdrop--break {
+  background: linear-gradient(135deg, #1a0f0a 0%, #2d1810 30%, #1a1035 70%, #0a0f1e 100%);
+}
+
+.focustube-overlay__container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.focustube-overlay__glow {
+  position: absolute;
+  width: 400px;
+  height: 400px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(108, 60, 225, 0.15) 0%, transparent 70%);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  animation: focustube-pulse 4s ease-in-out infinite;
+}
+
+.focustube-overlay__glow--break {
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.15) 0%, transparent 70%);
+}
+
+@keyframes focustube-pulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.6; }
+  50% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+}
+
+.focustube-overlay__card {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  padding: 48px;
+  max-width: 520px;
+  width: 100%;
+  color: #ffffff;
+  animation: focustube-slideUp 0.5s ease-out;
+}
+
+@keyframes focustube-slideUp {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.focustube-overlay__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.focustube-overlay__logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+
+.focustube-overlay__badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #a78bfa;
+  background: rgba(167, 139, 250, 0.1);
+  padding: 6px 14px;
+  border-radius: 99px;
+  border: 1px solid rgba(167, 139, 250, 0.2);
+}
+
+.focustube-overlay__badge--break {
+  color: #F59E0B;
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.focustube-overlay__badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #a78bfa;
+  animation: focustube-blink 1.5s ease-in-out infinite;
+}
+
+.focustube-overlay__badge-dot--break {
+  background: #F59E0B;
+}
+
+@keyframes focustube-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.focustube-overlay__blocked-notice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.15);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 28px;
+  font-size: 13px;
+  color: #fca5a5;
+}
+
+.focustube-overlay__session-info {
+  margin-bottom: 28px;
+}
+
+.focustube-overlay__title {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  color: rgba(255, 255, 255, 0.45);
+  margin: 0 0 10px 0;
+}
+
+.focustube-overlay__lecture-name {
+  font-size: 22px;
+  font-weight: 700;
+  color: #ffffff;
+  margin: 0 0 8px 0;
+  line-height: 1.3;
+}
+
+.focustube-overlay__goal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+.focustube-overlay__goal svg {
+  color: #a78bfa;
+  flex-shrink: 0;
+}
+
+.focustube-overlay__goal-text {
+  font-size: 16px;
+  color: #a78bfa;
+  font-style: italic;
+  margin: 8px 0 0 0;
+}
+
+.focustube-overlay__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.focustube-overlay__stat {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  padding: 16px;
+  text-align: center;
+}
+
+.focustube-overlay__stat-value {
+  display: block;
+  font-size: 24px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #a78bfa, #60a5fa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 4px;
+}
+
+.focustube-overlay__stat-label {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.focustube-overlay__actions {
+  display: flex;
+  gap: 12px;
+}
+
+.focustube-overlay__actions--vertical {
+  flex-direction: column;
+}
+
+.focustube-overlay__btn {
+  flex: 1;
+  padding: 14px 24px;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.focustube-overlay__btn:hover {
+  transform: translateY(-1px);
+}
+
+.focustube-overlay__btn:active {
+  transform: translateY(0);
+}
+
+.focustube-overlay__btn--primary {
+  background: linear-gradient(135deg, #6C3CE1, #8B5CF6);
+  color: white;
+  box-shadow: 0 4px 20px rgba(108, 60, 225, 0.3);
+}
+
+.focustube-overlay__btn--primary:hover {
+  box-shadow: 0 6px 28px rgba(108, 60, 225, 0.45);
+}
+
+.focustube-overlay__btn--secondary {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.focustube-overlay__btn--secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.focustube-overlay__btn--success {
+  background: linear-gradient(135deg, #059669, #10B981);
+  color: white;
+  box-shadow: 0 4px 20px rgba(5, 150, 105, 0.3);
+}
+
+.focustube-overlay__btn--ghost {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.focustube-overlay__btn--ghost:hover {
+  color: white;
+}
+
+/* Break timer */
+.focustube-overlay__break-info {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.focustube-overlay__break-timer {
+  font-size: 64px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #F59E0B, #EF4444);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin: 16px 0 4px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.focustube-overlay__break-subtitle {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 14px;
+  margin: 0;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   MODAL STYLES — Intent confirmation + Emergency unlock modals
+   ═══════════════════════════════════════════════════════════════════════ */
+
+#focustube-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 100000;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+#focustube-modal.focustube-modal--visible {
+  opacity: 1;
+}
+
+.focustube-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.focustube-modal__container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.focustube-modal__card {
+  background: #1a1a2e;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 36px;
+  max-width: 460px;
+  width: 100%;
+  color: #ffffff;
+  animation: focustube-modalIn 0.3s ease-out;
+}
+
+@keyframes focustube-modalIn {
+  from { transform: scale(0.95) translateY(10px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+
+.focustube-modal__icon {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.focustube-modal__title {
+  font-size: 20px;
+  font-weight: 700;
+  text-align: center;
+  margin: 0 0 8px 0;
+}
+
+.focustube-modal__subtitle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  margin: 0 0 24px 0;
+  line-height: 1.5;
+}
+
+.focustube-modal__comparison {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.focustube-modal__topic {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.focustube-modal__topic-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.focustube-modal__topic-value {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: #a78bfa;
+}
+
+.focustube-modal__topic-value--dest {
+  color: #fca5a5;
+}
+
+.focustube-modal__divider {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.focustube-modal__relevance-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 99px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.focustube-modal__relevance-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.5s ease;
+}
+
+.focustube-modal__relevance-text {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+  text-align: center;
+  margin: 0 0 24px 0;
+}
+
+.focustube-modal__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.focustube-modal__btn {
+  width: 100%;
+  padding: 13px 20px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.focustube-modal__btn:hover {
+  transform: translateY(-1px);
+}
+
+.focustube-modal__btn--primary {
+  background: linear-gradient(135deg, #6C3CE1, #8B5CF6);
+  color: white;
+  box-shadow: 0 4px 16px rgba(108, 60, 225, 0.3);
+}
+
+.focustube-modal__btn--primary:hover {
+  box-shadow: 0 6px 24px rgba(108, 60, 225, 0.45);
+}
+
+.focustube-modal__btn--break {
+  background: rgba(245, 158, 11, 0.12);
+  color: #F59E0B;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.focustube-modal__btn--break:hover {
+  background: rgba(245, 158, 11, 0.2);
+}
+
+.focustube-modal__btn--ghost {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+}
+
+.focustube-modal__btn--ghost:hover {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.focustube-modal__btn--danger {
+  background: linear-gradient(135deg, #DC2626, #EF4444);
+  color: white;
+  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.3);
+}
+
+.focustube-modal__btn--danger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.focustube-modal__btn--danger.focustube-modal__btn--ready {
+  opacity: 1;
+  animation: focustube-readyPulse 1s ease-in-out infinite;
+}
+
+@keyframes focustube-readyPulse {
+  0%, 100% { box-shadow: 0 4px 16px rgba(220, 38, 38, 0.3); }
+  50% { box-shadow: 0 4px 28px rgba(220, 38, 38, 0.5); }
+}
+
+/* Emergency unlock */
+.focustube-modal__unlock-phrase {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.focustube-modal__phrase-text {
+  font-size: 16px;
+  font-weight: 600;
+  color: #a78bfa;
+  font-style: italic;
+  margin: 0;
+}
+
+.focustube-modal__input-wrapper {
+  margin-bottom: 20px;
+}
+
+.focustube-modal__input {
+  width: 100%;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: #ffffff;
+  font-size: 14px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.focustube-modal__input:focus {
+  border-color: rgba(167, 139, 250, 0.5);
+}
+
+.focustube-modal__input::placeholder {
+  color: rgba(255, 255, 255, 0.25);
+}
+
+/* Break duration picker */
+.focustube-modal__break-options {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.focustube-modal__break-btn {
+  flex: 1;
+  padding: 20px 16px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.focustube-modal__break-btn:hover {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+  color: #F59E0B;
+  transform: translateY(-2px);
+}
