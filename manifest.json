@@ -1,0 +1,69 @@
+{
+  "manifest_version": 3,
+  "name": "FocusTube",
+  "version": "1.0.0",
+  "description": "Transform YouTube into a focused learning environment during study sessions. Block distractions, track study time, and stay on topic.",
+  "icons": {
+    "16": "assets/icons/icon-16.png",
+    "32": "assets/icons/icon-32.png",
+    "48": "assets/icons/icon-48.png",
+    "128": "assets/icons/icon-128.png"
+  },
+  "permissions": [
+    "storage",
+    "alarms",
+    "notifications",
+    "webNavigation",
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://youtube.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://youtube.com/*"
+      ],
+      "js": [
+        "src/content/relevance.js",
+        "src/content/overlay.js",
+        "src/content/modal.js",
+        "src/content/content.js"
+      ],
+      "css": [
+        "src/content/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "assets/icons/icon-16.png",
+      "32": "assets/icons/icon-32.png",
+      "48": "assets/icons/icon-48.png",
+      "128": "assets/icons/icon-128.png"
+    },
+    "default_title": "FocusTube — Study Mode"
+  },
+  "options_page": "src/options/options.html",
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "assets/icons/*",
+        "src/dashboard/dashboard.html"
+      ],
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://youtube.com/*"
+      ]
+    }
+  ]
+}
