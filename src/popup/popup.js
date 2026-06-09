@@ -45,7 +45,6 @@
     takeBreakBtn: $('#take-break-btn'),
     endBreakBtn: $('#end-break-btn'),
     breakPicker: $('#break-picker'),
-    breakOptions: $$('.popup__break-option'),
     sessionActions: $('.popup__session-actions'),
 
     // Session controls
@@ -60,12 +59,24 @@
   let timerInterval = null;
   let breakTimerInterval = null;
   let currentSession = null;
+  let settings = null;
 
   // ─── Initialization ───────────────────────────────────────────────
 
   async function init() {
+    await loadSettings();
+    renderBreakOptions();
     bindEvents();
     await refreshState();
+  }
+
+  async function loadSettings() {
+    try {
+      const { settings: stored } = await chrome.storage.local.get('settings');
+      settings = stored || {};
+    } catch {
+      settings = {};
+    }
   }
 
   function bindEvents() {
@@ -76,12 +87,22 @@
     els.emergencyBtn.addEventListener('click', handleEmergencyUnlock);
     els.dashboardBtn.addEventListener('click', handleOpenDashboard);
     els.optionsBtn.addEventListener('click', handleOpenOptions);
+  }
 
-    els.breakOptions.forEach(btn => {
-      btn.addEventListener('click', () => {
-        const minutes = parseInt(btn.dataset.minutes, 10);
-        handleStartBreak(minutes);
-      });
+  // Render break duration buttons from settings (falls back to 5/10/15).
+  function renderBreakOptions() {
+    const durations = Array.isArray(settings?.breakDurations) && settings.breakDurations.length
+      ? settings.breakDurations
+      : [5, 10, 15];
+    const container = els.breakPicker?.querySelector('.popup__break-options');
+    if (!container) return;
+
+    container.innerHTML = durations
+      .map(m => `<button class="popup__break-option" data-minutes="${m}">${m} min</button>`)
+      .join('');
+
+    container.querySelectorAll('.popup__break-option').forEach(btn => {
+      btn.addEventListener('click', () => handleStartBreak(parseInt(btn.dataset.minutes, 10)));
     });
   }
 
@@ -173,7 +194,7 @@
   function updateTimer(session) {
     let studyMs = session.totalStudyMs || 0;
 
-    if (session.state === 'active') {
+    if (session.state === 'active' && session.onLecture) {
       studyMs += Date.now() - session.lastActiveTimestamp;
     }
 
@@ -293,11 +314,14 @@
   }
 
   async function handleEmergencyUnlock() {
-    const phrase = prompt(
-      'Type the following to unlock:\n\n"I choose to pause my study session"'
+    const phrase = settings?.emergencyUnlockPhrase || 'I choose to pause my study session';
+    const duration = settings?.emergencyUnlockDurationMinutes || 10;
+
+    const entered = prompt(
+      `Type the following to unlock YouTube for ${duration} minutes:\n\n"${phrase}"`
     );
 
-    if (phrase?.trim().toLowerCase() === 'i choose to pause my study session') {
+    if (entered?.trim().toLowerCase() === phrase.trim().toLowerCase()) {
       await sendMessage({ type: 'EMERGENCY_UNLOCK' });
       await refreshState();
     }

@@ -90,6 +90,27 @@ const FocusTubeRelevance = (() => {
   }
 
   /**
+   * Detect multi-word alias phrases (e.g. "dynamic programming") in raw text.
+   * Single-word tokenization can never surface these, so we scan the whole
+   * lowercased title and pull in the entire alias group when one is found.
+   */
+  function findPhraseAliases(text) {
+    const lower = (text || '').toLowerCase();
+    const found = new Set();
+
+    for (const group of TECH_ALIASES) {
+      for (const member of group) {
+        if (member.includes(' ') && lower.includes(member)) {
+          group.forEach(alias => found.add(alias));
+          break;
+        }
+      }
+    }
+
+    return found;
+  }
+
+  /**
    * Compute relevance score between two sets of keywords.
    * Returns a value between 0 and 1.
    */
@@ -127,6 +148,10 @@ const FocusTubeRelevance = (() => {
 
     const sourceExpanded = expandWithAliases(combinedSource);
     const destExpanded = expandWithAliases(destRaw);
+
+    // Fold in multi-word alias phrases that tokenization would otherwise miss.
+    findPhraseAliases(currentTitle).forEach(a => sourceExpanded.add(a));
+    findPhraseAliases(destinationTitle).forEach(a => destExpanded.add(a));
 
     const score = computeSimilarity(sourceExpanded, destExpanded);
 

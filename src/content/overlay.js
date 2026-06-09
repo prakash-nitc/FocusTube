@@ -38,7 +38,7 @@ const FocusTubeOverlay = (() => {
 
   function buildOverlayHTML(session, pageInfo) {
     const studyMs = session
-      ? session.totalStudyMs + (session.state === 'active' ? Date.now() - session.lastActiveTimestamp : 0)
+      ? session.totalStudyMs + (session.state === 'active' && session.onLecture ? Date.now() - session.lastActiveTimestamp : 0)
       : 0;
     const studyTime = formatDurationOverlay(studyMs);
     const focusScore = session

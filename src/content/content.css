@@ -4,44 +4,36 @@
    study mode is active, and styles the overlay/modal components.
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* ─── YouTube Element Hiding (only when .focustube-active) ──────────── */
+/* ─── YouTube Element Hiding ────────────────────────────────────────────
+   Each rule is gated on a per-feature body class (added by the content
+   script based on the user's "Clean Room" toggles), so individual elements
+   can be shown or hidden independently. */
 
-body.focustube-active #guide {
+body.focustube-hide-sidebar #guide,
+body.focustube-hide-sidebar #guide-button,
+body.focustube-hide-sidebar ytd-mini-guide-renderer {
   display: none !important;
 }
 
-body.focustube-active #guide-button {
+body.focustube-hide-recommendations #secondary,
+body.focustube-hide-recommendations #related {
   display: none !important;
 }
 
-body.focustube-active ytd-mini-guide-renderer {
+body.focustube-hide-shorts ytd-reel-shelf-renderer,
+body.focustube-hide-shorts ytd-rich-shelf-renderer[is-shorts] {
   display: none !important;
 }
 
-body.focustube-active #secondary {
+body.focustube-hide-comments #comments {
   display: none !important;
 }
 
-body.focustube-active #related {
+body.focustube-hide-endcards .ytp-ce-element {
   display: none !important;
 }
 
-body.focustube-active ytd-reel-shelf-renderer {
-  display: none !important;
-}
-
-body.focustube-active ytd-rich-shelf-renderer[is-shorts] {
-  display: none !important;
-}
-
-body.focustube-active #comments {
-  display: none !important;
-}
-
-body.focustube-active .ytp-ce-element {
-  display: none !important;
-}
-
+/* Category filter chips are always hidden in study mode (home distraction). */
 body.focustube-active #chip-bar {
   display: none !important;
 }

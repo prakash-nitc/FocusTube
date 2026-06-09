@@ -11,6 +11,9 @@ import {
 } from '../shared/storage.js';
 import { generateUUID, formatDuration, getPageType, isYouTubeVideoUrl } from '../shared/utils.js';
 
+// YouTube tab URL patterns (covers www, bare domain, and mobile).
+const YT_TAB_PATTERNS = ['*://www.youtube.com/*', '*://youtube.com/*', '*://m.youtube.com/*'];
+
 // ─── Initialization ──────────────────────────────────────────────────
 
 chrome.runtime.onInstalled.addListener(async (details) => {
@@ -102,6 +105,8 @@ async function startSession(data) {
     return { error: 'Session already active' };
   }
 
+  const settings = await getSettings();
+
   const session = {
     sessionId: generateUUID(),
     lectureTitle: data.lectureTitle || 'Untitled Lecture',
@@ -117,8 +122,17 @@ async function startSession(data) {
     breakEndTime: null,
     emergencyUnlockUntil: null,
     lastActiveTimestamp: Date.now(),
+    onLecture: true,        // Whether the user is currently on the lecture video
+    offLectureSince: null,  // Timestamp of when they last left the lecture
+    reminded: false,        // Whether a recovery reminder fired for the current away period
     keywords: data.keywords || [],
+    pomodoro: null,
   };
+
+  if (settings.pomodoroEnabled) {
+    const preset = settings.pomodoroPresets?.[settings.pomodoroPreset] || { study: 25, break: 5 };
+    session.pomodoro = { study: preset.study, break: preset.break, preset: settings.pomodoroPreset };
+  }
 
   await saveSession(session);
   await updateBadge();
@@ -126,6 +140,9 @@ async function startSession(data) {
   // Start periodic alarms
   startSessionTickAlarm();
   startDistractionCheckAlarm();
+  if (session.pomodoro) {
+    chrome.alarms.create(ALARM_NAMES.POMODORO_STUDY, { delayInMinutes: session.pomodoro.study });
+  }
 
   // Notify all YouTube tabs
   broadcastToYouTubeTabs({ type: MSG.SESSION_UPDATED, data: session });
@@ -137,9 +154,11 @@ async function endSession(data) {
   const session = await getSession();
   if (!session) return { error: 'No active session' };
 
-  // Calculate final study time
+  // Calculate final study time (the live portion only counts while on the lecture)
   if (session.state === SESSION_STATES.ACTIVE) {
-    session.totalStudyMs += Date.now() - session.lastActiveTimestamp;
+    if (session.onLecture) {
+      session.totalStudyMs += Date.now() - session.lastActiveTimestamp;
+    }
   } else if (session.state === SESSION_STATES.BREAK) {
     session.totalBreakMs += Date.now() - (session.breakStartTime || session.lastActiveTimestamp);
   }
@@ -177,13 +196,9 @@ async function getStatus() {
     return { active: false, session: null };
   }
 
-  // Calculate live study time
-  const live = { ...session };
-  if (live.state === SESSION_STATES.ACTIVE) {
-    live.totalStudyMs += Date.now() - live.lastActiveTimestamp;
-  }
-
-  return { active: true, session: live };
+  // Return the raw session — consumers (popup, overlay, badge) add the live
+  // delta themselves from totalStudyMs + (now - lastActiveTimestamp).
+  return { active: true, session };
 }
 
 // ─── Break Management ────────────────────────────────────────────────
@@ -194,8 +209,10 @@ async function startBreak(data) {
     return { error: 'No active session to break from' };
   }
 
-  // Accumulate study time so far
-  session.totalStudyMs += Date.now() - session.lastActiveTimestamp;
+  // Accumulate study time so far (only on-lecture time counts as study)
+  if (session.onLecture) {
+    session.totalStudyMs += Date.now() - session.lastActiveTimestamp;
+  }
   session.state = SESSION_STATES.BREAK;
   session.breakStartTime = Date.now();
   session.breakDurationMinutes = data?.minutes || 5;
@@ -203,10 +220,11 @@ async function startBreak(data) {
 
   await saveSession(session);
 
-  // Set break-end alarm
+  // Set break-end alarm; pause any pending Pomodoro study-period alarm
   chrome.alarms.create(ALARM_NAMES.BREAK_END, {
     when: session.breakEndTime,
   });
+  chrome.alarms.clear(ALARM_NAMES.POMODORO_STUDY);
 
   await updateBadge();
   broadcastToYouTubeTabs({ type: MSG.SESSION_UPDATED, data: session });
@@ -230,6 +248,11 @@ async function endBreak() {
 
   await saveSession(session);
   chrome.alarms.clear(ALARM_NAMES.BREAK_END);
+
+  // Resume the Pomodoro cycle: schedule the next study period.
+  if (session.pomodoro) {
+    chrome.alarms.create(ALARM_NAMES.POMODORO_STUDY, { delayInMinutes: session.pomodoro.study });
+  }
 
   await updateBadge();
   broadcastToYouTubeTabs({ type: MSG.SESSION_UPDATED, data: session });
@@ -308,7 +331,7 @@ async function navigateToLecture(sender) {
   if (tabId) {
     await chrome.tabs.update(tabId, { url: session.lectureUrl });
   } else {
-    const tabs = await chrome.tabs.query({ url: '*://www.youtube.com/*' });
+    const tabs = await chrome.tabs.query({ url: YT_TAB_PATTERNS });
     if (tabs.length > 0) {
       await chrome.tabs.update(tabs[0].id, { url: session.lectureUrl, active: true });
     } else {
@@ -352,8 +375,29 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     case ALARM_NAMES.SESSION_TICK:
       await handleSessionTick();
       break;
+
+    case ALARM_NAMES.POMODORO_STUDY:
+      await handlePomodoroStudyEnd();
+      break;
   }
 });
+
+async function handlePomodoroStudyEnd() {
+  const session = await getSession();
+  if (!session || session.state !== SESSION_STATES.ACTIVE || !session.pomodoro) return;
+
+  chrome.notifications.create('pomodoro-break', {
+    type: 'basic',
+    iconUrl: chrome.runtime.getURL('assets/icons/icon-128.png'),
+    title: 'Pomodoro complete! 🍅',
+    message: `Nice focus. Time for a ${session.pomodoro.break}-minute break.`,
+    priority: 2,
+    requireInteraction: true,
+  });
+
+  // Automatically start the break; endBreak() reschedules the next study period.
+  await startBreak({ minutes: session.pomodoro.break });
+}
 
 async function handleBreakEnd() {
   const session = await getSession();
@@ -395,28 +439,26 @@ async function handleDistractionCheck() {
   const session = await getSession();
   if (!session || session.state !== SESSION_STATES.ACTIVE) return;
 
+  // Only remind once per away period, and only while actually off the lecture.
+  if (session.onLecture || !session.offLectureSince || session.reminded) return;
+
   const settings = await getSettings();
+  const reminderMs = (settings.recoveryReminderMinutes || 15) * 60 * 1000;
+  const awayMs = Date.now() - session.offLectureSince;
 
-  // Check if any YouTube tab is on the lecture URL
-  const tabs = await chrome.tabs.query({ url: '*://www.youtube.com/*' });
-  const onLecture = tabs.some(t => t.url && t.url.includes(session.lectureUrl?.split('?')[0]?.split('&')[0]));
+  if (awayMs >= reminderMs) {
+    session.reminded = true;
+    await saveSession(session);
 
-  if (!onLecture && tabs.length > 0) {
-    const awayMs = Date.now() - session.lastActiveTimestamp;
-    const reminderMs = (settings.recoveryReminderMinutes || 15) * 60 * 1000;
-
-    if (awayMs >= reminderMs) {
-      const awayFormatted = formatDuration(awayMs);
-      chrome.notifications.create('recovery-reminder', {
-        type: 'basic',
-        iconUrl: chrome.runtime.getURL('assets/icons/icon-128.png'),
-        title: `You left your study session ${awayFormatted} ago`,
-        message: `Return to: ${session.lectureTitle}`,
-        priority: 2,
-        requireInteraction: true,
-        buttons: [{ title: 'Resume Study' }],
-      });
-    }
+    chrome.notifications.create('recovery-reminder', {
+      type: 'basic',
+      iconUrl: chrome.runtime.getURL('assets/icons/icon-128.png'),
+      title: `You left your study session ${formatDuration(awayMs)} ago`,
+      message: `Return to: ${session.lectureTitle}`,
+      priority: 2,
+      requireInteraction: true,
+      buttons: [{ title: 'Resume Study' }],
+    });
   }
 }
 
@@ -424,19 +466,32 @@ async function handleSessionTick() {
   await updateBadge();
 }
 
-// Handle notification clicks
+// Bring the lecture into focus in an existing YouTube tab, or open a new one.
+async function focusLectureTab() {
+  const session = await getSession();
+  if (!session?.lectureUrl) return;
+
+  const tabs = await chrome.tabs.query({ url: YT_TAB_PATTERNS });
+  if (tabs.length > 0) {
+    await chrome.tabs.update(tabs[0].id, { url: session.lectureUrl, active: true });
+    await chrome.windows.update(tabs[0].windowId, { focused: true });
+  } else {
+    await chrome.tabs.create({ url: session.lectureUrl });
+  }
+}
+
+// Handle notification body clicks
 chrome.notifications.onClicked.addListener(async (notificationId) => {
-  if (notificationId === 'recovery-reminder' || notificationId === 'break-end') {
-    const session = await getSession();
-    if (session?.lectureUrl) {
-      const tabs = await chrome.tabs.query({ url: '*://www.youtube.com/*' });
-      if (tabs.length > 0) {
-        await chrome.tabs.update(tabs[0].id, { url: session.lectureUrl, active: true });
-        await chrome.windows.update(tabs[0].windowId, { focused: true });
-      } else {
-        await chrome.tabs.create({ url: session.lectureUrl });
-      }
-    }
+  if (['recovery-reminder', 'break-end', 'pomodoro-break'].includes(notificationId)) {
+    await focusLectureTab();
+    chrome.notifications.clear(notificationId);
+  }
+});
+
+// Handle notification action-button clicks (e.g. "Resume Study")
+chrome.notifications.onButtonClicked.addListener(async (notificationId, buttonIndex) => {
+  if (notificationId === 'recovery-reminder' && buttonIndex === 0) {
+    await focusLectureTab();
     chrome.notifications.clear(notificationId);
   }
 });
@@ -449,17 +504,30 @@ chrome.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
   const session = await getSession();
   if (!session || session.state === SESSION_STATES.ENDED) return;
 
-  // Check if emergency unlocked
-  if (session.emergencyUnlockUntil && Date.now() < session.emergencyUnlockUntil) {
-    return; // Allow all navigation during unlock
-  }
-
   const pageType = getPageType(details.url);
 
-  // Update last active timestamp if watching lecture
-  if (pageType === 'watch' && details.url.includes(getVideoIdFromUrl(session.lectureUrl))) {
-    session.lastActiveTimestamp = Date.now();
-    await saveSession(session);
+  // Track lecture presence so study time only accrues while on the lecture,
+  // and so distraction recovery knows when the user wandered off.
+  if (session.state === SESSION_STATES.ACTIVE) {
+    const lectureVideoId = getVideoIdFromUrl(session.lectureUrl);
+    const isOnLecture = pageType === 'watch' && !!lectureVideoId &&
+      getVideoIdFromUrl(details.url) === lectureVideoId;
+
+    if (isOnLecture && !session.onLecture) {
+      // Returned to the lecture — credit a recovery if a reminder had fired.
+      if (session.reminded) session.recoveredSessions++;
+      session.onLecture = true;
+      session.offLectureSince = null;
+      session.reminded = false;
+      session.lastActiveTimestamp = Date.now();
+      await saveSession(session);
+    } else if (!isOnLecture && session.onLecture) {
+      // Left the lecture — bank the study time accrued so far and stop counting.
+      session.totalStudyMs += Date.now() - session.lastActiveTimestamp;
+      session.onLecture = false;
+      session.offLectureSince = Date.now();
+      await saveSession(session);
+    }
   }
 
   // Send page change event to content script
@@ -521,8 +589,9 @@ async function updateBadge() {
     return;
   }
 
-  // Show elapsed study time
-  const elapsed = session.totalStudyMs + (Date.now() - session.lastActiveTimestamp);
+  // Show elapsed study time (the live portion only counts while on the lecture)
+  const elapsed = session.totalStudyMs +
+    (session.onLecture ? Date.now() - session.lastActiveTimestamp : 0);
   const minutes = Math.floor(elapsed / 60000);
   const text = minutes >= 60 ? `${Math.floor(minutes / 60)}h` : `${minutes}m`;
 
@@ -534,7 +603,7 @@ async function updateBadge() {
 
 async function broadcastToYouTubeTabs(message) {
   try {
-    const tabs = await chrome.tabs.query({ url: '*://www.youtube.com/*' });
+    const tabs = await chrome.tabs.query({ url: YT_TAB_PATTERNS });
     for (const tab of tabs) {
       try {
         await chrome.tabs.sendMessage(tab.id, message);

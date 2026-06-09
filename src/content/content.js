@@ -39,6 +39,16 @@
   let observer = null;
   let linkInterceptActive = false;
   let lastUrl = location.href;
+  let settings = {};
+
+  // Maps each "Hide …" setting to the body class that activates its CSS rule.
+  const HIDE_CLASS_MAP = {
+    hideSidebar:         'focustube-hide-sidebar',
+    hideRecommendations: 'focustube-hide-recommendations',
+    hideShorts:          'focustube-hide-shorts',
+    hideComments:        'focustube-hide-comments',
+    hideEndCards:        'focustube-hide-endcards',
+  };
 
   // ─── Initialization ───────────────────────────────────────────────
 
@@ -58,8 +68,35 @@
     // Listen for messages from background
     chrome.runtime.onMessage.addListener(handleMessage);
 
+    // Re-apply hiding instantly when settings change in the options page
+    chrome.storage.onChanged.addListener((changes, area) => {
+      if (area === 'local' && changes.settings) {
+        settings = changes.settings.newValue || {};
+        applyHideClasses();
+      }
+    });
+
     // Listen for YouTube SPA navigation
     listenForNavigation();
+  }
+
+  async function loadSettings() {
+    try {
+      const stored = await chrome.storage.local.get('settings');
+      settings = stored.settings || {};
+    } catch {
+      settings = {};
+    }
+  }
+
+  // Toggle a body class per "Hide …" setting (defaults to hidden when unset).
+  function applyHideClasses() {
+    const body = document.body;
+    if (!body) return;
+    for (const [setting, cls] of Object.entries(HIDE_CLASS_MAP)) {
+      const enabled = isStudyModeActive && settings[setting] !== false;
+      body.classList.toggle(cls, enabled);
+    }
   }
 
   // ─── Message Handling ──────────────────────────────────────────────
@@ -100,8 +137,10 @@
 
   // ─── Study Mode Activation ────────────────────────────────────────
 
-  function activateStudyMode() {
+  async function activateStudyMode() {
+    await loadSettings();
     document.body.classList.add('focustube-active');
+    applyHideClasses();
     startMutationObserver();
     startLinkInterception();
     evaluatePage(location.href);
@@ -109,6 +148,7 @@
 
   function deactivateStudyMode() {
     document.body.classList.remove('focustube-active');
+    Object.values(HIDE_CLASS_MAP).forEach(cls => document.body.classList.remove(cls));
     stopMutationObserver();
     stopLinkInterception();
     window.FocusTubeOverlay?.remove();
@@ -155,16 +195,18 @@
   function startMutationObserver() {
     if (observer) return;
 
-    observer = new MutationObserver((mutations) => {
-      // Re-apply body class if YouTube removed it
+    // Watch only the body's class attribute — far cheaper than observing the
+    // whole subtree, and it directly catches YouTube wiping our classes.
+    observer = new MutationObserver(() => {
       if (isStudyModeActive && !document.body.classList.contains('focustube-active')) {
         document.body.classList.add('focustube-active');
+        applyHideClasses();
       }
     });
 
     observer.observe(document.body, {
-      childList: true,
-      subtree: true,
+      attributes: true,
+      attributeFilter: ['class'],
     });
   }
 
@@ -232,18 +274,22 @@
     );
 
     if (relevance && relevance.verdict === 'RELATED') {
-      return; // Allow related content
+      return; // Allow clearly related content in any mode
     }
 
     // Intercept — prevent default and show modal
     event.preventDefault();
     event.stopPropagation();
 
+    // Strict mode removes the "Continue Anyway" escape hatch.
+    const strict = settings.strictnessLevel === 'strict';
+
     window.FocusTubeModal?.showIntentModal(
       currentSession,
       destTitle,
       href,
-      relevance
+      relevance,
+      strict
     ).then(action => {
       if (action === 'continue') {
         // User chose to continue — navigate manually

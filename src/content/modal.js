@@ -8,12 +8,12 @@ const FocusTubeModal = (() => {
   const MODAL_ID = 'focustube-modal';
   let emergencyUnlockCallback = null;
 
-  function showIntentModal(session, destinationTitle, destinationUrl, relevanceResult) {
+  function showIntentModal(session, destinationTitle, destinationUrl, relevanceResult, strict = false) {
     remove(); // Remove any existing modal
 
     const modal = document.createElement('div');
     modal.id = MODAL_ID;
-    modal.innerHTML = buildIntentModalHTML(session, destinationTitle, relevanceResult);
+    modal.innerHTML = buildIntentModalHTML(session, destinationTitle, relevanceResult, strict);
     document.body.appendChild(modal);
 
     // Animate in
@@ -26,20 +26,25 @@ const FocusTubeModal = (() => {
     });
   }
 
-  function showEmergencyUnlockModal(session) {
+  function showEmergencyUnlockModal() {
     remove();
 
-    const modal = document.createElement('div');
-    modal.id = MODAL_ID;
-    modal.innerHTML = buildEmergencyUnlockHTML(session);
-    document.body.appendChild(modal);
-
-    requestAnimationFrame(() => {
-      modal.classList.add('focustube-modal--visible');
-    });
-
     return new Promise((resolve) => {
-      bindEmergencyEvents(modal, session, resolve);
+      chrome.storage.local.get('settings', ({ settings }) => {
+        const phrase = settings?.emergencyUnlockPhrase || 'I choose to pause my study session';
+        const duration = settings?.emergencyUnlockDurationMinutes || 10;
+
+        const modal = document.createElement('div');
+        modal.id = MODAL_ID;
+        modal.innerHTML = buildEmergencyUnlockHTML(phrase, duration);
+        document.body.appendChild(modal);
+
+        requestAnimationFrame(() => {
+          modal.classList.add('focustube-modal--visible');
+        });
+
+        bindEmergencyEvents(modal, phrase, resolve);
+      });
     });
   }
 
@@ -51,7 +56,7 @@ const FocusTubeModal = (() => {
     }
   }
 
-  function buildIntentModalHTML(session, destinationTitle, relevanceResult) {
+  function buildIntentModalHTML(session, destinationTitle, relevanceResult, strict = false) {
     const score = relevanceResult?.score || 0;
     const verdict = relevanceResult?.verdict || 'UNRELATED';
     const isPartial = verdict === 'PARTIALLY_RELATED';
@@ -109,9 +114,13 @@ const FocusTubeModal = (() => {
             <button class="focustube-modal__btn focustube-modal__btn--break" id="focustube-modal-break">
               ☕ Take a Break
             </button>
-            <button class="focustube-modal__btn focustube-modal__btn--ghost" id="focustube-modal-continue">
-              Continue Anyway
-            </button>
+            ${strict ? `
+              <p class="focustube-modal__relevance-text">Strict mode is on — unrelated videos are blocked.</p>
+            ` : `
+              <button class="focustube-modal__btn focustube-modal__btn--ghost" id="focustube-modal-continue">
+                Continue Anyway
+              </button>
+            `}
           </div>
 
         </div>
@@ -119,7 +128,7 @@ const FocusTubeModal = (() => {
     `;
   }
 
-  function buildEmergencyUnlockHTML(session) {
+  function buildEmergencyUnlockHTML(phrase, duration) {
     return `
       <div class="focustube-modal__backdrop" id="focustube-modal-backdrop"></div>
       <div class="focustube-modal__container">
@@ -133,12 +142,12 @@ const FocusTubeModal = (() => {
 
           <h2 class="focustube-modal__title">Emergency Unlock</h2>
           <p class="focustube-modal__subtitle">
-            This will temporarily disable FocusTube protections for 10 minutes.
+            This will temporarily disable FocusTube protections for ${duration} minutes.
             Type the phrase below to confirm:
           </p>
 
           <div class="focustube-modal__unlock-phrase">
-            <p class="focustube-modal__phrase-text">I choose to pause my study session</p>
+            <p class="focustube-modal__phrase-text">${escapeHtml(phrase)}</p>
           </div>
 
           <div class="focustube-modal__input-wrapper">
@@ -154,7 +163,7 @@ const FocusTubeModal = (() => {
 
           <div class="focustube-modal__actions">
             <button class="focustube-modal__btn focustube-modal__btn--danger" id="focustube-unlock-confirm" disabled>
-              🔓 Unlock for 10 Minutes
+              🔓 Unlock for ${duration} Minutes
             </button>
             <button class="focustube-modal__btn focustube-modal__btn--ghost" id="focustube-unlock-cancel">
               Cancel
@@ -231,13 +240,13 @@ const FocusTubeModal = (() => {
     });
   }
 
-  function bindEmergencyEvents(modal, session, resolve) {
+  function bindEmergencyEvents(modal, phrase, resolve) {
     const input = modal.querySelector('#focustube-unlock-input');
     const confirmBtn = modal.querySelector('#focustube-unlock-confirm');
     const cancelBtn = modal.querySelector('#focustube-unlock-cancel');
     const backdrop = modal.querySelector('#focustube-modal-backdrop');
 
-    const targetPhrase = 'i choose to pause my study session';
+    const targetPhrase = phrase.trim().toLowerCase();
 
     input?.addEventListener('input', () => {
       const matches = input.value.trim().toLowerCase() === targetPhrase;
