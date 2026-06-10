@@ -1,0 +1,156 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   FocusTube — Floating Pomodoro Clock
+   A compact, draggable countdown widget injected on any page.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+#focustube-floating-clock.ft-clock {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 2147483647;            /* sit above virtually everything */
+  width: 184px;
+  padding: 12px 14px 14px;
+  box-sizing: border-box;
+  background: rgba(20, 16, 38, 0.92);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(167, 139, 250, 0.28);
+  border-radius: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+#focustube-floating-clock.ft-clock--break {
+  border-color: rgba(45, 212, 191, 0.35);
+}
+
+#focustube-floating-clock.ft-clock--dragging {
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.55);
+}
+
+#focustube-floating-clock .ft-clock__drag {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: grab;
+  margin-bottom: 6px;
+  touch-action: none;
+}
+
+#focustube-floating-clock.ft-clock--dragging .ft-clock__drag {
+  cursor: grabbing;
+}
+
+#focustube-floating-clock .ft-clock__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #a78bfa;
+  flex-shrink: 0;
+}
+
+#focustube-floating-clock.ft-clock--break .ft-clock__dot {
+  background: #2dd4bf;
+}
+
+#focustube-floating-clock.ft-clock--running .ft-clock__dot {
+  animation: ft-clock-blink 1.4s ease-in-out infinite;
+}
+
+@keyframes ft-clock-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+#focustube-floating-clock .ft-clock__phase {
+  flex: 1;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+#focustube-floating-clock .ft-clock__hide {
+  all: unset;
+  cursor: pointer;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  font-size: 16px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+#focustube-floating-clock .ft-clock__hide:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+#focustube-floating-clock .ft-clock__time {
+  font-size: 40px;
+  font-weight: 800;
+  line-height: 1.05;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -1px;
+  background: linear-gradient(135deg, #a78bfa, #60a5fa);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+#focustube-floating-clock.ft-clock--break .ft-clock__time {
+  background: linear-gradient(135deg, #2dd4bf, #38bdf8);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+#focustube-floating-clock .ft-clock__cycle {
+  min-height: 13px;
+  margin-top: 2px;
+  text-align: center;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+#focustube-floating-clock .ft-clock__controls {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+#focustube-floating-clock .ft-clock__btn {
+  all: unset;
+  flex: 1;
+  text-align: center;
+  cursor: pointer;
+  padding: 7px 0;
+  border-radius: 9px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #fff;
+  transition: background 0.15s ease;
+}
+
+#focustube-floating-clock .ft-clock__btn:hover {
+  background: rgba(167, 139, 250, 0.25);
+}
+
+#focustube-floating-clock .ft-clock__btn[data-role="toggle"] {
+  background: linear-gradient(135deg, #6C3CE1, #8B5CF6);
+  border-color: transparent;
+}
+
+#focustube-floating-clock.ft-clock--break .ft-clock__btn[data-role="toggle"] {
+  background: linear-gradient(135deg, #0d9488, #14b8a6);
+}

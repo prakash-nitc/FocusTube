@@ -30,7 +30,16 @@ async function set(data) {
 
 export async function getSession() {
   const { activeSession } = await get('activeSession');
-  return activeSession || null;
+  if (!activeSession) return null;
+
+  // Migrate sessions created before lecture-presence tracking existed,
+  // so their study timer keeps ticking after an extension update.
+  if (activeSession.onLecture === undefined) {
+    activeSession.onLecture = true;
+    activeSession.offLectureSince = null;
+    activeSession.reminded = false;
+  }
+  return activeSession;
 }
 
 export async function saveSession(session) {
@@ -146,6 +155,21 @@ function calculateFocusScore(session) {
   const total = session.totalStudyMs + session.totalBreakMs;
   if (total === 0) return 100;
   return Math.round((session.totalStudyMs / total) * 100);
+}
+
+// ─── Pomodoro Timer State ────────────────────────────────────────────
+
+export async function getPomodoro() {
+  const { pomodoro } = await get('pomodoro');
+  return pomodoro || null;
+}
+
+export async function savePomodoro(state) {
+  await set({ pomodoro: state });
+}
+
+export async function clearPomodoro() {
+  await chrome.storage.local.remove('pomodoro');
 }
 
 // ─── Settings ────────────────────────────────────────────────────────

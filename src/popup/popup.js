@@ -54,12 +54,25 @@
     // Footer
     dashboardBtn: $('#open-dashboard-btn'),
     optionsBtn: $('#open-options-btn'),
+
+    // Pomodoro
+    pomoCard: $('#pomodoro-card'),
+    pomoDot: $('#pomo-dot'),
+    pomoPhase: $('#pomo-phase'),
+    pomoCycle: $('#pomo-cycle'),
+    pomoTime: $('#pomo-time'),
+    pomoToggle: $('#pomo-toggle'),
+    pomoSkip: $('#pomo-skip'),
+    pomoReset: $('#pomo-reset'),
+    pomoClockToggle: $('#pomo-clock-toggle'),
   };
 
   let timerInterval = null;
   let breakTimerInterval = null;
   let currentSession = null;
   let settings = null;
+  let pomodoroState = null;
+  let pomodoroInterval = null;
 
   // ─── Initialization ───────────────────────────────────────────────
 
@@ -67,7 +80,18 @@
     await loadSettings();
     renderBreakOptions();
     bindEvents();
-    await refreshState();
+    bindPomodoro();
+
+    // Keep the Pomodoro display in sync if it changes elsewhere.
+    chrome.runtime.onMessage.addListener((message) => {
+      if (message?.type === 'POMODORO_UPDATED') {
+        pomodoroState = sanitizePomodoro(message.data);
+        renderPomodoro();
+      }
+    });
+    pomodoroInterval = setInterval(renderPomodoro, 1000);
+
+    await Promise.all([refreshState(), loadPomodoro()]);
   }
 
   async function loadSettings() {
@@ -78,6 +102,73 @@
       settings = {};
     }
   }
+
+  // ─── Pomodoro Timer ────────────────────────────────────────────────
+
+  function bindPomodoro() {
+    els.pomoToggle.addEventListener('click', () => {
+      const running = pomodoroState?.status === 'running';
+      pomodoroCommand(running ? 'POMODORO_PAUSE' : 'POMODORO_START');
+    });
+    els.pomoSkip.addEventListener('click', () => pomodoroCommand('POMODORO_SKIP'));
+    els.pomoReset.addEventListener('click', () => pomodoroCommand('POMODORO_RESET'));
+
+    // Floating clock toggle — saving the setting mounts/unmounts the widget
+    // live on every open tab via each content script's storage.onChanged.
+    els.pomoClockToggle.checked = !!settings?.floatingClockEnabled;
+    els.pomoClockToggle.addEventListener('change', async () => {
+      const { settings: existing } = await chrome.storage.local.get('settings');
+      const merged = { ...(existing || {}), floatingClockEnabled: els.pomoClockToggle.checked };
+      await chrome.storage.local.set({ settings: merged });
+      settings = merged;
+    });
+  }
+
+  async function pomodoroCommand(type) {
+    try {
+      pomodoroState = sanitizePomodoro(await sendMessage({ type }));
+    } catch (e) {
+      // Background unreachable — keep the last known state.
+    }
+    renderPomodoro();
+  }
+
+  async function loadPomodoro() {
+    await pomodoroCommand('POMODORO_GET');
+  }
+
+  // Reject malformed responses (e.g. an {error} object from an outdated
+  // background script) so the display falls back to a fresh idle timer.
+  function sanitizePomodoro(state) {
+    const valid = state && ['idle', 'running', 'paused'].includes(state.status);
+    return valid ? state : null;
+  }
+
+  function pomodoroRemainingMs() {
+    if (!pomodoroState || pomodoroState.status === 'idle') {
+      const mins = Number(settings?.pomodoroFocusMinutes) || 25;
+      return mins * 60000;
+    }
+    if (pomodoroState.status === 'paused') return Math.max(0, pomodoroState.remainingMs || 0);
+    return Math.max(0, (pomodoroState.phaseEndTime || Date.now()) - Date.now());
+  }
+
+  function renderPomodoro() {
+    const phase = pomodoroState?.phase || 'focus';
+    const status = pomodoroState?.status || 'idle';
+    const isBreak = phase !== 'focus';
+
+    els.pomoCard.classList.toggle('popup__pomodoro--break', isBreak);
+    els.pomoDot.classList.toggle('popup__pomodoro-dot--running', status === 'running');
+    els.pomoPhase.textContent = { focus: 'Focus', shortBreak: 'Short Break', longBreak: 'Long Break' }[phase] || 'Focus';
+    els.pomoTime.textContent = formatTimer(pomodoroRemainingMs());
+    els.pomoToggle.textContent = status === 'running' ? 'Pause' : (status === 'paused' ? 'Resume' : 'Start');
+
+    const done = pomodoroState?.completedFocus || 0;
+    els.pomoCycle.textContent = done > 0 ? '🍅'.repeat(Math.min(done, 8)) : '';
+  }
+
+  // ─── Session Controls ──────────────────────────────────────────────
 
   function bindEvents() {
     els.startBtn.addEventListener('click', handleStartSession);
@@ -245,7 +336,10 @@
     }
 
     const goal = els.goalInput.value.trim();
-    const lectureTitle = tab.title?.replace(' - YouTube', '').trim() || 'Untitled Lecture';
+    const lectureTitle = (tab.title || '')
+      .replace(/^\(\d+\)\s*/, '')     // strip "(3) " unread-notification count
+      .replace(/ - YouTube$/, '')
+      .trim() || 'Untitled Lecture';
 
     // Extract keywords from title
     const keywords = extractKeywords(lectureTitle);

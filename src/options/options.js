@@ -16,11 +16,24 @@
     hideShorts: true,
     hideComments: true,
     hideEndCards: true,
-    pomodoroEnabled: false,
-    pomodoroPreset: '25/5',
+    pomodoroFocusMinutes: 25,
+    pomodoroShortBreakMinutes: 5,
+    pomodoroLongBreakMinutes: 15,
+    pomodoroCyclesBeforeLongBreak: 4,
+    pomodoroAutoStartNext: true,
+    pomodoroAlarmSound: 'chime',
+    pomodoroAlarmVolume: 0.7,
+    floatingClockEnabled: false,
     recoveryReminderMinutes: 15,
     emergencyUnlockPhrase: 'I choose to pause my study session',
     emergencyUnlockDurationMinutes: 10,
+  };
+
+  // Presets fill the focus/break fields when clicked.
+  const PRESETS = {
+    '25/5':  { focus: 25, shortBreak: 5,  longBreak: 15 },
+    '50/10': { focus: 50, shortBreak: 10, longBreak: 20 },
+    '90/15': { focus: 90, shortBreak: 15, longBreak: 30 },
   };
 
   // ─── Initialization ───────────────────────────────────────────────
@@ -43,7 +56,7 @@
       $('#strictness-standard').checked = true;
     }
 
-    // Toggles
+    // Clean Room toggles
     $('#toggle-sidebar').checked = s.hideSidebar;
     $('#toggle-recommendations').checked = s.hideRecommendations;
     $('#toggle-shorts').checked = s.hideShorts;
@@ -51,9 +64,16 @@
     $('#toggle-endcards').checked = s.hideEndCards;
 
     // Pomodoro
-    $('#toggle-pomodoro').checked = s.pomodoroEnabled;
-    updatePomodoroUI(s.pomodoroEnabled);
-    setActivePreset(s.pomodoroPreset);
+    $('#focus-minutes').value = String(s.pomodoroFocusMinutes);
+    $('#short-break-minutes').value = String(s.pomodoroShortBreakMinutes);
+    $('#long-break-minutes').value = String(s.pomodoroLongBreakMinutes);
+    $('#cycles-before-long').value = String(s.pomodoroCyclesBeforeLongBreak);
+    $('#toggle-autostart').checked = s.pomodoroAutoStartNext;
+    $('#alarm-sound').value = s.pomodoroAlarmSound;
+    $('#alarm-volume').value = String(Math.round((s.pomodoroAlarmVolume ?? 0.7) * 100));
+
+    // Floating clock
+    $('#toggle-floating-clock').checked = s.floatingClockEnabled;
 
     // Recovery
     $('#recovery-interval').value = String(s.recoveryReminderMinutes);
@@ -66,16 +86,23 @@
   // ─── Bind Events ───────────────────────────────────────────────────
 
   function bindEvents() {
-    // Pomodoro toggle
-    $('#toggle-pomodoro').addEventListener('change', (e) => {
-      updatePomodoroUI(e.target.checked);
-    });
-
-    // Pomodoro presets
+    // Presets fill the number inputs
     $$('.options__preset').forEach(btn => {
       btn.addEventListener('click', () => {
-        setActivePreset(btn.dataset.preset);
+        const preset = PRESETS[btn.dataset.preset];
+        if (!preset) return;
+        $('#focus-minutes').value = String(preset.focus);
+        $('#short-break-minutes').value = String(preset.shortBreak);
+        $('#long-break-minutes').value = String(preset.longBreak);
+        $$('.options__preset').forEach(b => b.classList.toggle('options__preset--active', b === btn));
       });
+    });
+
+    // Test the selected alarm sound
+    $('#test-sound').addEventListener('click', () => {
+      const sound = $('#alarm-sound').value;
+      const volume = (parseInt($('#alarm-volume').value, 10) || 0) / 100;
+      if (sound !== 'none') playTone(sound, volume);
     });
 
     // Save
@@ -83,6 +110,12 @@
   }
 
   // ─── Save Settings ─────────────────────────────────────────────────
+
+  function clampNum(sel, def, min, max) {
+    const v = parseInt($(sel).value, 10);
+    if (!Number.isFinite(v)) return def;
+    return Math.max(min, Math.min(max, v));
+  }
 
   async function saveSettings() {
     const settings = {
@@ -92,14 +125,20 @@
       hideShorts: $('#toggle-shorts').checked,
       hideComments: $('#toggle-comments').checked,
       hideEndCards: $('#toggle-endcards').checked,
-      pomodoroEnabled: $('#toggle-pomodoro').checked,
-      pomodoroPreset: getActivePreset(),
+      pomodoroFocusMinutes: clampNum('#focus-minutes', 25, 1, 180),
+      pomodoroShortBreakMinutes: clampNum('#short-break-minutes', 5, 1, 60),
+      pomodoroLongBreakMinutes: clampNum('#long-break-minutes', 15, 1, 90),
+      pomodoroCyclesBeforeLongBreak: clampNum('#cycles-before-long', 4, 1, 12),
+      pomodoroAutoStartNext: $('#toggle-autostart').checked,
+      pomodoroAlarmSound: $('#alarm-sound').value,
+      pomodoroAlarmVolume: (parseInt($('#alarm-volume').value, 10) || 70) / 100,
+      floatingClockEnabled: $('#toggle-floating-clock').checked,
       recoveryReminderMinutes: parseInt($('#recovery-interval').value, 10) || 15,
       emergencyUnlockPhrase: $('#unlock-phrase').value.trim() || DEFAULT_SETTINGS.emergencyUnlockPhrase,
       emergencyUnlockDurationMinutes: parseInt($('#unlock-duration').value, 10) || 10,
     };
 
-    // Merge with existing settings (preserve fields not on this page)
+    // Merge with existing settings (preserve fields not on this page, e.g. clock position).
     const { settings: existing } = await chrome.storage.local.get('settings');
     const merged = { ...(existing || {}), ...settings };
 
@@ -114,26 +153,41 @@
     }, 2000);
   }
 
-  // ─── UI Helpers ────────────────────────────────────────────────────
+  // ─── Alarm Tone Preview (matches the offscreen player) ──────────────
 
-  function updatePomodoroUI(enabled) {
-    const presets = $('#pomodoro-presets');
-    if (enabled) {
-      presets.classList.add('options__pomodoro-presets--active');
-    } else {
-      presets.classList.remove('options__pomodoro-presets--active');
+  const SOUND_PATTERNS = {
+    chime: { type: 'sine',   notes: [[880, 0], [1108.73, 0.16], [1318.51, 0.32]], dur: 0.6 },
+    bell:  { type: 'sine',   notes: [[660, 0], [990, 0]],                          dur: 1.4 },
+    beep:  { type: 'square', notes: [[720, 0], [720, 0.22], [720, 0.44]],          dur: 0.14 },
+  };
+
+  function playTone(soundName, volume) {
+    const pattern = SOUND_PATTERNS[soundName] || SOUND_PATTERNS.chime;
+    const vol = Math.max(0, Math.min(1, typeof volume === 'number' ? volume : 0.7));
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    const ctx = new AudioCtx();
+    const now = ctx.currentTime;
+    let latestEnd = now;
+
+    for (const [freq, offset] of pattern.notes) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = pattern.type;
+      osc.frequency.value = freq;
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      const start = now + offset;
+      const end = start + pattern.dur;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(vol, start + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.0001, end);
+
+      osc.start(start);
+      osc.stop(end + 0.03);
+      latestEnd = Math.max(latestEnd, end);
     }
-  }
-
-  function setActivePreset(preset) {
-    $$('.options__preset').forEach(btn => {
-      btn.classList.toggle('options__preset--active', btn.dataset.preset === preset);
-    });
-  }
-
-  function getActivePreset() {
-    const active = $('.options__preset--active');
-    return active?.dataset?.preset || '25/5';
+    setTimeout(() => ctx.close().catch(() => {}), (latestEnd - now + 0.2) * 1000);
   }
 
   // ─── Start ─────────────────────────────────────────────────────────

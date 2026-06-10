@@ -86,29 +86,76 @@
 
       <!-- Pomodoro -->
       <section class="options__section">
-        <h2 class="options__section-title">Pomodoro Mode</h2>
-        <p class="options__section-desc">Automatically cycle between study and break periods.</p>
-
-        <label class="options__toggle" style="margin-bottom: 16px;">
-          <span>Enable Pomodoro</span>
-          <input type="checkbox" id="toggle-pomodoro">
-          <span class="options__toggle-slider"></span>
-        </label>
+        <h2 class="options__section-title">Pomodoro Timer</h2>
+        <p class="options__section-desc">Customize your focus and break lengths. The timer runs on its own — start it from the popup or the floating clock.</p>
 
         <div class="options__pomodoro-presets" id="pomodoro-presets">
-          <button class="options__preset" data-preset="25/5">
+          <button class="options__preset" data-preset="25/5" type="button">
             <strong>25 / 5</strong>
             <span>Classic</span>
           </button>
-          <button class="options__preset" data-preset="50/10">
+          <button class="options__preset" data-preset="50/10" type="button">
             <strong>50 / 10</strong>
             <span>Extended</span>
           </button>
-          <button class="options__preset" data-preset="90/15">
+          <button class="options__preset" data-preset="90/15" type="button">
             <strong>90 / 15</strong>
             <span>Deep Work</span>
           </button>
         </div>
+
+        <div class="options__grid">
+          <div class="options__num-field">
+            <label class="options__inline-label" for="focus-minutes">Focus (min)</label>
+            <input type="number" min="1" max="180" class="options__input options__input--num" id="focus-minutes">
+          </div>
+          <div class="options__num-field">
+            <label class="options__inline-label" for="short-break-minutes">Short break (min)</label>
+            <input type="number" min="1" max="60" class="options__input options__input--num" id="short-break-minutes">
+          </div>
+          <div class="options__num-field">
+            <label class="options__inline-label" for="long-break-minutes">Long break (min)</label>
+            <input type="number" min="1" max="90" class="options__input options__input--num" id="long-break-minutes">
+          </div>
+          <div class="options__num-field">
+            <label class="options__inline-label" for="cycles-before-long">Sessions before long break</label>
+            <input type="number" min="1" max="12" class="options__input options__input--num" id="cycles-before-long">
+          </div>
+        </div>
+
+        <label class="options__toggle" style="margin-top: 18px;">
+          <span>Auto-start next phase</span>
+          <input type="checkbox" id="toggle-autostart">
+          <span class="options__toggle-slider"></span>
+        </label>
+
+        <div class="options__inline-field" style="margin-top: 18px;">
+          <label class="options__inline-label">Alarm sound</label>
+          <select class="options__select options__select--inline" id="alarm-sound">
+            <option value="chime">Chime</option>
+            <option value="bell">Bell</option>
+            <option value="beep">Beep</option>
+            <option value="none">None (silent)</option>
+          </select>
+          <button class="options__test-sound" id="test-sound" type="button">▶ Test</button>
+        </div>
+
+        <div class="options__inline-field" style="margin-top: 12px;">
+          <label class="options__inline-label" for="alarm-volume">Volume</label>
+          <input type="range" min="0" max="100" id="alarm-volume" class="options__range">
+        </div>
+      </section>
+
+      <!-- Floating Clock -->
+      <section class="options__section">
+        <h2 class="options__section-title">Floating Clock</h2>
+        <p class="options__section-desc">Show a draggable Pomodoro countdown that floats over every page. Drag it anywhere; click × on the clock to hide it.</p>
+
+        <label class="options__toggle">
+          <span>Enable floating clock</span>
+          <input type="checkbox" id="toggle-floating-clock">
+          <span class="options__toggle-slider"></span>
+        </label>
       </section>
 
       <!-- Recovery Reminder -->

@@ -327,3 +327,51 @@ body {
 .options__save-status--visible {
   opacity: 1;
 }
+
+/* ─── Pomodoro custom fields ────────────────────────────────────────── */
+
+.options__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.options__num-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.options__num-field .options__inline-label {
+  white-space: normal;
+}
+
+.options__input--num {
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.options__test-sound {
+  padding: 10px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  color: #fff;
+  cursor: pointer;
+  background: rgba(167, 139, 250, 0.16);
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  transition: background 0.15s ease;
+  white-space: nowrap;
+}
+
+.options__test-sound:hover {
+  background: rgba(167, 139, 250, 0.28);
+}
+
+.options__range {
+  flex: 1;
+  accent-color: #8B5CF6;
+  cursor: pointer;
+}

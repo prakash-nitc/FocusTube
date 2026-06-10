@@ -3,11 +3,15 @@
  * Handles session management, alarms, navigation monitoring, badge, and notifications.
  */
 
-import { ALARM_NAMES, MSG, SESSION_STATES, RESTRICTED_URL_PATTERNS } from '../shared/constants.js';
+import {
+  ALARM_NAMES, MSG, SESSION_STATES, RESTRICTED_URL_PATTERNS,
+  POMODORO_PHASES, POMODORO_STATUS,
+} from '../shared/constants.js';
 import {
   getSession, saveSession, clearSession,
   getDailyStats, updateDailyStats, addSessionToHistory,
   getSettings, cleanupOldData,
+  getPomodoro, savePomodoro, clearPomodoro,
 } from '../shared/storage.js';
 import { generateUUID, formatDuration, getPageType, isYouTubeVideoUrl } from '../shared/utils.js';
 
@@ -92,6 +96,24 @@ async function handleMessage(message, sender) {
     case MSG.OPEN_DASHBOARD:
       return await openDashboard();
 
+    case MSG.POMODORO_GET:
+      return await getPomodoroState();
+
+    case MSG.POMODORO_START:
+      return await pomodoroStart();
+
+    case MSG.POMODORO_PAUSE:
+      return await pomodoroPause();
+
+    case MSG.POMODORO_RESUME:
+      return await pomodoroResume();
+
+    case MSG.POMODORO_RESET:
+      return await pomodoroReset();
+
+    case MSG.POMODORO_SKIP:
+      return await pomodoroSkip();
+
     default:
       return { error: 'Unknown message type' };
   }
@@ -104,8 +126,6 @@ async function startSession(data) {
   if (existing && existing.state !== SESSION_STATES.ENDED) {
     return { error: 'Session already active' };
   }
-
-  const settings = await getSettings();
 
   const session = {
     sessionId: generateUUID(),
@@ -126,13 +146,7 @@ async function startSession(data) {
     offLectureSince: null,  // Timestamp of when they last left the lecture
     reminded: false,        // Whether a recovery reminder fired for the current away period
     keywords: data.keywords || [],
-    pomodoro: null,
   };
-
-  if (settings.pomodoroEnabled) {
-    const preset = settings.pomodoroPresets?.[settings.pomodoroPreset] || { study: 25, break: 5 };
-    session.pomodoro = { study: preset.study, break: preset.break, preset: settings.pomodoroPreset };
-  }
 
   await saveSession(session);
   await updateBadge();
@@ -140,9 +154,6 @@ async function startSession(data) {
   // Start periodic alarms
   startSessionTickAlarm();
   startDistractionCheckAlarm();
-  if (session.pomodoro) {
-    chrome.alarms.create(ALARM_NAMES.POMODORO_STUDY, { delayInMinutes: session.pomodoro.study });
-  }
 
   // Notify all YouTube tabs
   broadcastToYouTubeTabs({ type: MSG.SESSION_UPDATED, data: session });
@@ -220,11 +231,10 @@ async function startBreak(data) {
 
   await saveSession(session);
 
-  // Set break-end alarm; pause any pending Pomodoro study-period alarm
+  // Set break-end alarm
   chrome.alarms.create(ALARM_NAMES.BREAK_END, {
     when: session.breakEndTime,
   });
-  chrome.alarms.clear(ALARM_NAMES.POMODORO_STUDY);
 
   await updateBadge();
   broadcastToYouTubeTabs({ type: MSG.SESSION_UPDATED, data: session });
@@ -248,11 +258,6 @@ async function endBreak() {
 
   await saveSession(session);
   chrome.alarms.clear(ALARM_NAMES.BREAK_END);
-
-  // Resume the Pomodoro cycle: schedule the next study period.
-  if (session.pomodoro) {
-    chrome.alarms.create(ALARM_NAMES.POMODORO_STUDY, { delayInMinutes: session.pomodoro.study });
-  }
 
   await updateBadge();
   broadcastToYouTubeTabs({ type: MSG.SESSION_UPDATED, data: session });
@@ -355,6 +360,243 @@ async function openDashboard() {
   return { success: true };
 }
 
+// ─── Standalone Pomodoro Timer ───────────────────────────────────────
+
+function pomodoroConfig(settings) {
+  const m = (v, d) => (Number.isFinite(v) && v > 0 ? v : d);
+  return {
+    focusMs: m(settings.pomodoroFocusMinutes, 25) * 60000,
+    shortMs: m(settings.pomodoroShortBreakMinutes, 5) * 60000,
+    longMs:  m(settings.pomodoroLongBreakMinutes, 15) * 60000,
+    cycles:  Math.max(1, Math.round(settings.pomodoroCyclesBeforeLongBreak || 4)),
+    autoStart: settings.pomodoroAutoStartNext !== false,
+  };
+}
+
+function phaseDuration(phase, cfg) {
+  if (phase === POMODORO_PHASES.SHORT_BREAK) return cfg.shortMs;
+  if (phase === POMODORO_PHASES.LONG_BREAK) return cfg.longMs;
+  return cfg.focusMs;
+}
+
+function freshPomodoro() {
+  return {
+    status: POMODORO_STATUS.IDLE,
+    phase: POMODORO_PHASES.FOCUS,
+    phaseEndTime: null,
+    remainingMs: null,
+    phaseDurationMs: 0,
+    completedFocus: 0,
+  };
+}
+
+async function getPomodoroState() {
+  return (await getPomodoro()) || freshPomodoro();
+}
+
+function setPomodoroAlarm(state) {
+  if (state.status === POMODORO_STATUS.RUNNING && state.phaseEndTime) {
+    chrome.alarms.create(ALARM_NAMES.POMODORO_PHASE, { when: state.phaseEndTime });
+  }
+}
+
+// Notify tabs (floating clock) and extension pages (popup/options).
+function broadcastPomodoro(state) {
+  broadcastToAllTabs({ type: MSG.POMODORO_UPDATED, data: state });
+  chrome.runtime.sendMessage({ type: MSG.POMODORO_UPDATED, data: state }).catch(() => {});
+}
+
+async function commitPomodoro(state) {
+  await savePomodoro(state);
+  setPomodoroAlarm(state);
+  broadcastPomodoro(state);
+  return state;
+}
+
+async function pomodoroStart() {
+  const settings = await getSettings();
+  const cfg = pomodoroConfig(settings);
+  let state = await getPomodoroState();
+
+  if (state.status === POMODORO_STATUS.RUNNING) return state;
+
+  if (state.status === POMODORO_STATUS.PAUSED && state.remainingMs > 0) {
+    // Resume the paused phase from where it left off.
+    state.phaseEndTime = Date.now() + state.remainingMs;
+  } else {
+    // Begin a fresh focus phase.
+    state = freshPomodoro();
+    state.phase = POMODORO_PHASES.FOCUS;
+    state.phaseDurationMs = phaseDuration(state.phase, cfg);
+    state.phaseEndTime = Date.now() + state.phaseDurationMs;
+  }
+  state.status = POMODORO_STATUS.RUNNING;
+  state.remainingMs = null;
+
+  return commitPomodoro(state);
+}
+
+async function pomodoroPause() {
+  const state = await getPomodoroState();
+  if (state.status !== POMODORO_STATUS.RUNNING) return state;
+
+  state.remainingMs = Math.max(0, (state.phaseEndTime || Date.now()) - Date.now());
+  state.phaseEndTime = null;
+  state.status = POMODORO_STATUS.PAUSED;
+
+  chrome.alarms.clear(ALARM_NAMES.POMODORO_PHASE);
+  await savePomodoro(state);
+  broadcastPomodoro(state);
+  return state;
+}
+
+async function pomodoroResume() {
+  return pomodoroStart(); // start() resumes a paused phase
+}
+
+async function pomodoroReset() {
+  const state = freshPomodoro();
+  chrome.alarms.clear(ALARM_NAMES.POMODORO_PHASE);
+  await savePomodoro(state);
+  broadcastPomodoro(state);
+  return state;
+}
+
+async function pomodoroSkip() {
+  const state = await getPomodoroState();
+  if (state.status === POMODORO_STATUS.IDLE) return state;
+  return advancePomodoro(state, true);
+}
+
+async function handlePomodoroPhaseEnd() {
+  const state = await getPomodoroState();
+  if (state.status !== POMODORO_STATUS.RUNNING) return;
+  await advancePomodoro(state, false);
+}
+
+// Advance focus → break → focus …, optionally auto-starting the next phase.
+async function advancePomodoro(state, viaSkip) {
+  const settings = await getSettings();
+  const cfg = pomodoroConfig(settings);
+  const endedPhase = state.phase;
+
+  let nextPhase;
+  if (endedPhase === POMODORO_PHASES.FOCUS) {
+    state.completedFocus += 1;
+    nextPhase = (state.completedFocus % cfg.cycles === 0)
+      ? POMODORO_PHASES.LONG_BREAK
+      : POMODORO_PHASES.SHORT_BREAK;
+  } else {
+    nextPhase = POMODORO_PHASES.FOCUS;
+  }
+
+  state.phase = nextPhase;
+  state.phaseDurationMs = phaseDuration(nextPhase, cfg);
+
+  // A manual skip always rolls straight into the next phase; otherwise honor auto-start.
+  if (viaSkip || cfg.autoStart) {
+    state.status = POMODORO_STATUS.RUNNING;
+    state.phaseEndTime = Date.now() + state.phaseDurationMs;
+    state.remainingMs = null;
+  } else {
+    state.status = POMODORO_STATUS.PAUSED;
+    state.phaseEndTime = null;
+    state.remainingMs = state.phaseDurationMs;
+  }
+
+  await commitPomodoro(state);
+
+  // Notify + chime only when a phase ends on its own (not on a manual skip).
+  if (!viaSkip) {
+    notifyPomodoroPhase(nextPhase);
+    await playAlarmSound(settings);
+  }
+  return state;
+}
+
+function notifyPomodoroPhase(nextPhase) {
+  const isBreakNext = nextPhase !== POMODORO_PHASES.FOCUS;
+  const label = nextPhase === POMODORO_PHASES.LONG_BREAK ? 'long break'
+    : nextPhase === POMODORO_PHASES.SHORT_BREAK ? 'short break'
+    : 'focus session';
+
+  chrome.notifications.create('pomodoro-phase', {
+    type: 'basic',
+    iconUrl: chrome.runtime.getURL('assets/icons/icon-128.png'),
+    title: isBreakNext ? 'Focus complete! 🍅' : 'Break over — back to focus 💪',
+    message: isBreakNext ? `Nice work. Time for a ${label}.` : `Starting your next ${label}.`,
+    priority: 2,
+    requireInteraction: true,
+  });
+}
+
+// ─── Offscreen Audio (alarm sounds) ──────────────────────────────────
+
+async function playAlarmSound(settings) {
+  const sound = settings.pomodoroAlarmSound || 'chime';
+  if (sound === 'none') return;
+
+  try {
+    await ensureOffscreenDocument();
+    await chrome.runtime.sendMessage({
+      target: 'offscreen',
+      type: 'PLAY_ALARM',
+      sound,
+      volume: typeof settings.pomodoroAlarmVolume === 'number' ? settings.pomodoroAlarmVolume : 0.7,
+    });
+  } catch (e) {
+    console.warn('[FocusTube] Could not play alarm sound:', e);
+  }
+}
+
+async function ensureOffscreenDocument() {
+  if (chrome.offscreen?.hasDocument) {
+    const has = await chrome.offscreen.hasDocument();
+    if (has) return;
+  }
+  try {
+    await chrome.offscreen.createDocument({
+      url: chrome.runtime.getURL('src/offscreen/offscreen.html'),
+      reasons: ['AUDIO_PLAYBACK'],
+      justification: 'Play the Pomodoro alarm sound when a focus or break period ends.',
+    });
+  } catch (e) {
+    // A document may already exist due to a race — that's fine.
+    if (!String(e?.message || '').includes('Only a single offscreen')) throw e;
+  }
+}
+
+// ─── Floating Clock Injection ────────────────────────────────────────
+// Content scripts only auto-inject into pages loaded after the extension
+// starts. When the user flips the clock on, push it into every open tab so
+// it appears immediately — no page refresh needed. The script's own guard
+// prevents double-mounting where it is already loaded.
+
+chrome.storage.onChanged.addListener(async (changes, area) => {
+  if (area !== 'local' || !changes.settings) return;
+
+  const wasEnabled = changes.settings.oldValue?.floatingClockEnabled === true;
+  const isEnabled = changes.settings.newValue?.floatingClockEnabled === true;
+  if (!isEnabled || wasEnabled) return;
+
+  const tabs = await chrome.tabs.query({ url: ['http://*/*', 'https://*/*'] });
+  for (const tab of tabs) {
+    if (!tab.id) continue;
+    try {
+      await chrome.scripting.insertCSS({
+        target: { tabId: tab.id },
+        files: ['src/content/floating-clock.css'],
+      });
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        files: ['src/content/floating-clock.js'],
+      });
+    } catch {
+      // Tab not injectable (Web Store, browser pages, etc.) — skip it.
+    }
+  }
+});
+
 // ─── Alarm Handling ──────────────────────────────────────────────────
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
@@ -376,28 +618,11 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       await handleSessionTick();
       break;
 
-    case ALARM_NAMES.POMODORO_STUDY:
-      await handlePomodoroStudyEnd();
+    case ALARM_NAMES.POMODORO_PHASE:
+      await handlePomodoroPhaseEnd();
       break;
   }
 });
-
-async function handlePomodoroStudyEnd() {
-  const session = await getSession();
-  if (!session || session.state !== SESSION_STATES.ACTIVE || !session.pomodoro) return;
-
-  chrome.notifications.create('pomodoro-break', {
-    type: 'basic',
-    iconUrl: chrome.runtime.getURL('assets/icons/icon-128.png'),
-    title: 'Pomodoro complete! 🍅',
-    message: `Nice focus. Time for a ${session.pomodoro.break}-minute break.`,
-    priority: 2,
-    requireInteraction: true,
-  });
-
-  // Automatically start the break; endBreak() reschedules the next study period.
-  await startBreak({ minutes: session.pomodoro.break });
-}
 
 async function handleBreakEnd() {
   const session = await getSession();
@@ -498,7 +723,10 @@ chrome.notifications.onButtonClicked.addListener(async (notificationId, buttonIn
 
 // ─── URL Monitoring (SPA Navigation) ─────────────────────────────────
 
-chrome.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
+// Covers both SPA navigations (onHistoryStateUpdated — how YouTube usually
+// moves between pages) and full page loads (onCommitted — reloads, new tabs),
+// so lecture-presence tracking never goes stale.
+async function handleYouTubeNavigation(details) {
   if (details.frameId !== 0) return; // Only main frame
 
   const session = await getSession();
@@ -539,9 +767,11 @@ chrome.webNavigation.onHistoryStateUpdated.addListener(async (details) => {
   } catch {
     // Tab might not have content script loaded
   }
-}, {
-  url: [{ hostContains: 'youtube.com' }],
-});
+}
+
+const YT_NAV_FILTER = { url: [{ hostContains: 'youtube.com' }] };
+chrome.webNavigation.onHistoryStateUpdated.addListener(handleYouTubeNavigation, YT_NAV_FILTER);
+chrome.webNavigation.onCommitted.addListener(handleYouTubeNavigation, YT_NAV_FILTER);
 
 function getVideoIdFromUrl(url) {
   if (!url) return '';
@@ -610,6 +840,19 @@ async function broadcastToYouTubeTabs(message) {
       } catch {
         // Content script may not be loaded
       }
+    }
+  } catch {
+    // Tabs query may fail
+  }
+}
+
+// Broadcast to every tab (used by the floating clock, which runs on all sites).
+async function broadcastToAllTabs(message) {
+  try {
+    const tabs = await chrome.tabs.query({});
+    for (const tab of tabs) {
+      if (!tab.id) continue;
+      chrome.tabs.sendMessage(tab.id, message).catch(() => {});
     }
   } catch {
     // Tabs query may fail

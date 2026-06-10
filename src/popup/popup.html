@@ -30,6 +30,25 @@
       </div>
     </header>
 
+    <!-- Pomodoro Timer (standalone, always available) -->
+    <section class="popup__pomodoro" id="pomodoro-card">
+      <div class="popup__pomodoro-head">
+        <span class="popup__pomodoro-dot" id="pomo-dot"></span>
+        <span class="popup__pomodoro-phase" id="pomo-phase">Focus</span>
+        <span class="popup__pomodoro-cycle" id="pomo-cycle"></span>
+      </div>
+      <div class="popup__pomodoro-time" id="pomo-time">25:00</div>
+      <div class="popup__pomodoro-controls">
+        <button class="popup__pomodoro-btn popup__pomodoro-btn--primary" id="pomo-toggle">Start</button>
+        <button class="popup__pomodoro-btn" id="pomo-skip">Skip</button>
+        <button class="popup__pomodoro-btn" id="pomo-reset">Reset</button>
+      </div>
+      <label class="popup__pomodoro-clock">
+        <input type="checkbox" id="pomo-clock-toggle">
+        <span>🕐 Floating clock on all pages</span>
+      </label>
+    </section>
+
     <!-- Idle State (No active session) -->
     <div class="popup__state" id="state-idle">
 

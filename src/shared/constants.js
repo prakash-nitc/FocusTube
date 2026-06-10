@@ -56,11 +56,23 @@ export const SESSION_STATES = {
 // ─── Alarm Names ─────────────────────────────────────────────────────
 export const ALARM_NAMES = {
   BREAK_END: 'focustube-break-end',
-  POMODORO_STUDY: 'focustube-pomodoro-study',
-  POMODORO_BREAK: 'focustube-pomodoro-break',
+  POMODORO_PHASE: 'focustube-pomodoro-phase',
   DISTRACTION_CHECK: 'focustube-distraction-check',
   EMERGENCY_UNLOCK_END: 'focustube-emergency-unlock-end',
   SESSION_TICK: 'focustube-session-tick',
+};
+
+// ─── Pomodoro Phases ─────────────────────────────────────────────────
+export const POMODORO_PHASES = {
+  FOCUS: 'focus',
+  SHORT_BREAK: 'shortBreak',
+  LONG_BREAK: 'longBreak',
+};
+
+export const POMODORO_STATUS = {
+  IDLE: 'idle',
+  RUNNING: 'running',
+  PAUSED: 'paused',
 };
 
 // ─── Message Types ───────────────────────────────────────────────────
@@ -83,7 +95,14 @@ export const MSG = {
   GET_WEEKLY_STATS: 'GET_WEEKLY_STATS',
   GET_SESSION_HISTORY: 'GET_SESSION_HISTORY',
   OPEN_DASHBOARD: 'OPEN_DASHBOARD',
-  POMODORO_TICK: 'POMODORO_TICK',
+  // Standalone Pomodoro timer
+  POMODORO_START: 'POMODORO_START',
+  POMODORO_PAUSE: 'POMODORO_PAUSE',
+  POMODORO_RESUME: 'POMODORO_RESUME',
+  POMODORO_RESET: 'POMODORO_RESET',
+  POMODORO_SKIP: 'POMODORO_SKIP',
+  POMODORO_GET: 'POMODORO_GET',
+  POMODORO_UPDATED: 'POMODORO_UPDATED',
 };
 
 // ─── Default Settings ────────────────────────────────────────────────
@@ -98,13 +117,25 @@ export const DEFAULT_SETTINGS = {
     'github.com',
   ],
   breakDurations: [5, 10, 15],
-  pomodoroEnabled: false,
-  pomodoroPreset: '25/5',
+
+  // ── Pomodoro (standalone timer) ──
+  pomodoroFocusMinutes: 25,
+  pomodoroShortBreakMinutes: 5,
+  pomodoroLongBreakMinutes: 15,
+  pomodoroCyclesBeforeLongBreak: 4,
+  pomodoroAutoStartNext: true,     // auto-start the next phase when one ends
+  pomodoroAlarmSound: 'chime',     // 'chime' | 'bell' | 'beep' | 'none'
+  pomodoroAlarmVolume: 0.7,        // 0..1
   pomodoroPresets: {
-    '25/5':  { study: 25, break: 5 },
-    '50/10': { study: 50, break: 10 },
-    '90/15': { study: 90, break: 15 },
+    '25/5':  { focus: 25, shortBreak: 5,  longBreak: 15 },
+    '50/10': { focus: 50, shortBreak: 10, longBreak: 20 },
+    '90/15': { focus: 90, shortBreak: 15, longBreak: 30 },
   },
+
+  // ── Floating clock overlay ──
+  floatingClockEnabled: false,
+  floatingClockPosition: { right: 24, bottom: 24 },
+
   strictnessLevel: 'standard', // 'standard' | 'strict'
   hideComments: true,
   hideSidebar: true,

@@ -15,11 +15,12 @@
     "notifications",
     "webNavigation",
     "activeTab",
-    "tabs"
+    "tabs",
+    "offscreen",
+    "scripting"
   ],
   "host_permissions": [
-    "https://www.youtube.com/*",
-    "https://youtube.com/*"
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "src/background/service-worker.js",
@@ -41,6 +42,19 @@
         "src/content/content.css"
       ],
       "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "src/content/floating-clock.js"
+      ],
+      "css": [
+        "src/content/floating-clock.css"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
     }
   ],
   "action": {
