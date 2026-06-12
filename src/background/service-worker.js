@@ -10,6 +10,7 @@ import {
 import {
   getSession, saveSession, clearSession,
   getDailyStats, updateDailyStats, addSessionToHistory,
+  getWeeklyStats, getSessionHistory,
   getSettings, cleanupOldData,
   getPomodoro, savePomodoro, clearPomodoro,
 } from '../shared/storage.js';
@@ -80,15 +81,13 @@ async function handleMessage(message, sender) {
     case MSG.GET_DAILY_STATS:
       return await getDailyStats(message.data?.date);
 
-    case MSG.GET_WEEKLY_STATS: {
-      const { getWeeklyStats } = await import('../shared/storage.js');
+    // NOTE: dynamic import() is disallowed in MV3 service workers — these
+    // must use the static imports at the top of the file.
+    case MSG.GET_WEEKLY_STATS:
       return await getWeeklyStats();
-    }
 
-    case MSG.GET_SESSION_HISTORY: {
-      const { getSessionHistory } = await import('../shared/storage.js');
+    case MSG.GET_SESSION_HISTORY:
       return await getSessionHistory();
-    }
 
     case MSG.COMPLETE_GOAL:
       return await completeGoal(message.data);
@@ -162,6 +161,7 @@ async function startSession(data) {
 }
 
 async function endSession(data) {
+  await syncLecturePresence(); // Settle presence so the final tally is exact
   const session = await getSession();
   if (!session) return { error: 'No active session' };
 
@@ -202,7 +202,8 @@ async function endSession(data) {
 }
 
 async function getStatus() {
-  const session = await getSession();
+  // Refresh lecture presence first so the popup always reflects reality.
+  const session = await syncLecturePresence();
   if (!session || session.state === SESSION_STATES.ENDED) {
     return { active: false, session: null };
   }
@@ -215,6 +216,7 @@ async function getStatus() {
 // ─── Break Management ────────────────────────────────────────────────
 
 async function startBreak(data) {
+  await syncLecturePresence(); // Settle presence so banked study time is exact
   const session = await getSession();
   if (!session || session.state !== SESSION_STATES.ACTIVE) {
     return { error: 'No active session to break from' };
@@ -661,7 +663,7 @@ async function handleEmergencyUnlockEnd() {
 }
 
 async function handleDistractionCheck() {
-  const session = await getSession();
+  const session = await syncLecturePresence();
   if (!session || session.state !== SESSION_STATES.ACTIVE) return;
 
   // Only remind once per away period, and only while actually off the lecture.
@@ -688,6 +690,7 @@ async function handleDistractionCheck() {
 }
 
 async function handleSessionTick() {
+  await syncLecturePresence(); // Self-heal presence once a minute
   await updateBadge();
 }
 
@@ -721,6 +724,54 @@ chrome.notifications.onButtonClicked.addListener(async (notificationId, buttonIn
   }
 });
 
+// ─── Lecture Presence Tracking ───────────────────────────────────────
+// "On lecture" means the lecture video is open in at least one tab. Presence
+// is recomputed from the live tab list (never inferred from single events)
+// on every YouTube navigation, on the minute tick, when a tab closes, and
+// when the popup asks for status — so it self-heals if an event is missed.
+
+async function isLectureOpen(session) {
+  const lectureVideoId = getVideoIdFromUrl(session.lectureUrl);
+  if (!lectureVideoId) return true; // Can't identify the lecture — fail open
+  try {
+    const tabs = await chrome.tabs.query({ url: YT_TAB_PATTERNS });
+    return tabs.some(t => getVideoIdFromUrl(t.url || '') === lectureVideoId);
+  } catch {
+    return true;
+  }
+}
+
+async function syncLecturePresence() {
+  const session = await getSession();
+  if (!session || session.state !== SESSION_STATES.ACTIVE) return session;
+
+  const open = await isLectureOpen(session);
+  if (open === !!session.onLecture) return session; // No transition
+
+  if (open) {
+    // Back on the lecture — credit a recovery if a reminder had fired.
+    if (session.reminded) session.recoveredSessions++;
+    session.onLecture = true;
+    session.offLectureSince = null;
+    session.reminded = false;
+    session.lastActiveTimestamp = Date.now();
+  } else {
+    // Lecture closed everywhere — bank accrued study time and stop counting.
+    session.totalStudyMs += Date.now() - session.lastActiveTimestamp;
+    session.onLecture = false;
+    session.offLectureSince = Date.now();
+  }
+
+  await saveSession(session);
+  broadcastToYouTubeTabs({ type: MSG.SESSION_UPDATED, data: session });
+  return session;
+}
+
+// A closed tab can take the lecture with it.
+chrome.tabs.onRemoved.addListener(() => {
+  syncLecturePresence().catch(() => {});
+});
+
 // ─── URL Monitoring (SPA Navigation) ─────────────────────────────────
 
 // Covers both SPA navigations (onHistoryStateUpdated — how YouTube usually
@@ -734,29 +785,11 @@ async function handleYouTubeNavigation(details) {
 
   const pageType = getPageType(details.url);
 
-  // Track lecture presence so study time only accrues while on the lecture,
-  // and so distraction recovery knows when the user wandered off.
-  if (session.state === SESSION_STATES.ACTIVE) {
-    const lectureVideoId = getVideoIdFromUrl(session.lectureUrl);
-    const isOnLecture = pageType === 'watch' && !!lectureVideoId &&
-      getVideoIdFromUrl(details.url) === lectureVideoId;
-
-    if (isOnLecture && !session.onLecture) {
-      // Returned to the lecture — credit a recovery if a reminder had fired.
-      if (session.reminded) session.recoveredSessions++;
-      session.onLecture = true;
-      session.offLectureSince = null;
-      session.reminded = false;
-      session.lastActiveTimestamp = Date.now();
-      await saveSession(session);
-    } else if (!isOnLecture && session.onLecture) {
-      // Left the lecture — bank the study time accrued so far and stop counting.
-      session.totalStudyMs += Date.now() - session.lastActiveTimestamp;
-      session.onLecture = false;
-      session.offLectureSince = Date.now();
-      await saveSession(session);
-    }
-  }
+  // Re-derive lecture presence from the actual set of open tabs. Deciding
+  // from this single navigation event is wrong: a navigation in ANOTHER
+  // YouTube tab would flip the flag off even though the lecture tab is
+  // still open — and passive watching fires no event to flip it back.
+  await syncLecturePresence();
 
   // Send page change event to content script
   try {

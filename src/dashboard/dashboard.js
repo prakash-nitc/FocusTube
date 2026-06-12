@@ -84,7 +84,7 @@
   async function loadWeeklyChart() {
     try {
       const weeklyData = await sendMessage({ type: 'GET_WEEKLY_STATS' });
-      if (!weeklyData) return;
+      if (!Array.isArray(weeklyData) || weeklyData.length === 0) return;
 
       const canvas = $('#weekly-chart');
       if (!canvas) return;
@@ -115,6 +115,13 @@
 
     // Clear
     ctx.clearRect(0, 0, w, h);
+
+    // Friendly empty state instead of bare axes
+    const hasData = data.some(d => (d.totalStudyMs || 0) > 0 || (d.totalBreakMs || 0) > 0);
+    if (!hasData) {
+      drawEmptyMessage(ctx, w, h, 'No study time recorded this week — start a session! 📚');
+      return;
+    }
 
     // Find max value
     const maxMs = Math.max(
@@ -181,7 +188,7 @@
   async function loadDistractionsChart() {
     try {
       const weeklyData = await sendMessage({ type: 'GET_WEEKLY_STATS' });
-      if (!weeklyData) return;
+      if (!Array.isArray(weeklyData) || weeklyData.length === 0) return;
 
       const canvas = $('#distractions-chart');
       if (!canvas) return;
@@ -210,6 +217,13 @@
     const chartH = h - padding.top - padding.bottom;
 
     ctx.clearRect(0, 0, w, h);
+
+    // Friendly empty state instead of a flat zero line
+    const hasData = data.some(d => (d.distractionAttempts || 0) > 0);
+    if (!hasData) {
+      drawEmptyMessage(ctx, w, h, 'No distractions recorded this week 🎉');
+      return;
+    }
 
     const maxVal = Math.max(...data.map(d => d.distractionAttempts || 0), 5);
 
@@ -282,7 +296,7 @@
   async function loadGoalsSummary() {
     try {
       const history = await sendMessage({ type: 'GET_SESSION_HISTORY' });
-      if (!history) return;
+      if (!Array.isArray(history)) return;
 
       const withGoals = history.filter(s => s.goal);
       const completed = withGoals.filter(s => s.goalCompleted).length;
@@ -303,7 +317,7 @@
   async function loadHistory() {
     try {
       const history = await sendMessage({ type: 'GET_SESSION_HISTORY' });
-      if (!history || history.length === 0) return;
+      if (!Array.isArray(history) || history.length === 0) return;
 
       const container = $('#history-list');
       container.innerHTML = history.map(session => {
@@ -365,6 +379,14 @@
     const minutes = totalMinutes % 60;
     if (hours > 0) return `${hours}h ${minutes}m`;
     return `${minutes}m`;
+  }
+
+  function drawEmptyMessage(ctx, w, h, text) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.font = '14px -apple-system, "Segoe UI", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, w / 2, h / 2);
   }
 
   function roundRect(ctx, x, y, w, h, r) {
