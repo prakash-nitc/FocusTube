@@ -77,6 +77,10 @@
   // ─── Initialization ───────────────────────────────────────────────
 
   async function init() {
+    // Hold a port open for the popup's lifetime so the background knows the
+    // user is in Chrome and won't pause the study clock while we're visible.
+    try { chrome.runtime.connect({ name: 'ft-popup' }); } catch {}
+
     await loadSettings();
     renderBreakOptions();
     bindEvents();

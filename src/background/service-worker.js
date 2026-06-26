@@ -19,6 +19,22 @@ import { generateUUID, formatDuration, getPageType, isYouTubeVideoUrl } from '..
 // YouTube tab URL patterns (covers www, bare domain, and mobile).
 const YT_TAB_PATTERNS = ['*://www.youtube.com/*', '*://youtube.com/*', '*://m.youtube.com/*'];
 
+// True while the action popup is open. Opening the popup makes Chrome report
+// the browser window as unfocused (the popup is a separate platform window),
+// which would wrongly pause the study clock — so while it's open we treat the
+// browser as focused. The popup keeps a port open for exactly this lifetime.
+let popupOpen = false;
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== 'ft-popup') return;
+  popupOpen = true;
+  syncSessionActivity({ focused: true }).catch(() => {});
+  port.onDisconnect.addListener(() => {
+    popupOpen = false;
+    syncSessionActivity().catch(() => {});
+  });
+});
+
 // ─── Initialization ──────────────────────────────────────────────────
 
 chrome.runtime.onInstalled.addListener(async (details) => {
@@ -62,7 +78,7 @@ async function handleMessage(message, sender) {
       return await endSession(message.data);
 
     case MSG.GET_STATUS:
-      return await getStatus();
+      return await getStatus(sender);
 
     case MSG.START_BREAK:
       return await startBreak(message.data);
@@ -209,9 +225,11 @@ async function endSession(data) {
   return { success: true };
 }
 
-async function getStatus() {
-  // Refresh lecture presence first so the popup always reflects reality.
-  const session = await syncSessionActivity();
+async function getStatus(sender) {
+  // A status request from the popup means the user is in Chrome, so force the
+  // focused state for that sync (covers any race before the popup's port lands).
+  const fromPopup = !!sender?.url && sender.url.includes('/popup/popup.html');
+  const session = await syncSessionActivity(fromPopup ? { focused: true } : {});
   if (!session || session.state === SESSION_STATES.ENDED) {
     return { active: false, session: null };
   }
@@ -797,6 +815,7 @@ function reconcileSessionClock(session) {
 
 // True when Chrome currently holds OS focus (any window focused).
 async function isChromeFocused() {
+  if (popupOpen) return true; // Popup open ⇒ user is in Chrome
   try {
     const win = await chrome.windows.getLastFocused();
     return !!win && win.focused === true;
@@ -878,7 +897,7 @@ chrome.tabs.onRemoved.addListener(() => {
 // Chrome gaining/losing OS focus pauses or resumes the study clock.
 // WINDOW_ID_NONE means focus left Chrome entirely (another app, minimized).
 chrome.windows.onFocusChanged.addListener((windowId) => {
-  const focused = windowId !== chrome.windows.WINDOW_ID_NONE;
+  const focused = popupOpen || windowId !== chrome.windows.WINDOW_ID_NONE;
   syncSessionActivity({ focused }).catch(() => {});
 });
 
