@@ -30,10 +30,14 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 });
 
 chrome.runtime.onStartup.addListener(async () => {
+  // Settle the clock first: bank only up-to-heartbeat study time from before
+  // the browser was closed, then refresh presence and the badge.
+  await syncSessionActivity();
   await updateBadge();
-  // Resume distraction check alarm if session is active
+  // Resume periodic alarms if a session is still active
   const session = await getSession();
   if (session && session.state === SESSION_STATES.ACTIVE) {
+    startSessionTickAlarm();
     startDistractionCheckAlarm();
   }
 });
@@ -141,7 +145,10 @@ async function startSession(data) {
     breakEndTime: null,
     emergencyUnlockUntil: null,
     lastActiveTimestamp: Date.now(),
-    onLecture: true,        // Whether the user is currently on the lecture video
+    lastHeartbeat: Date.now(), // Stamped each minute tick; bounds time credit across browser quits
+    onLecture: true,        // Whether the lecture video is open in some tab
+    windowFocused: true,    // Whether Chrome currently has OS focus
+    counting: true,         // Whether study time is accruing right now (onLecture && windowFocused)
     offLectureSince: null,  // Timestamp of when they last left the lecture
     reminded: false,        // Whether a recovery reminder fired for the current away period
     keywords: data.keywords || [],
@@ -161,13 +168,14 @@ async function startSession(data) {
 }
 
 async function endSession(data) {
-  await syncLecturePresence(); // Settle presence so the final tally is exact
+  await syncSessionActivity(); // Settle presence so the final tally is exact
   const session = await getSession();
   if (!session) return { error: 'No active session' };
 
-  // Calculate final study time (the live portion only counts while on the lecture)
+  // Calculate final study time (the live portion only counts while the clock
+  // is running — lecture open and Chrome focused)
   if (session.state === SESSION_STATES.ACTIVE) {
-    if (session.onLecture) {
+    if (session.counting) {
       session.totalStudyMs += Date.now() - session.lastActiveTimestamp;
     }
   } else if (session.state === SESSION_STATES.BREAK) {
@@ -203,7 +211,7 @@ async function endSession(data) {
 
 async function getStatus() {
   // Refresh lecture presence first so the popup always reflects reality.
-  const session = await syncLecturePresence();
+  const session = await syncSessionActivity();
   if (!session || session.state === SESSION_STATES.ENDED) {
     return { active: false, session: null };
   }
@@ -216,16 +224,17 @@ async function getStatus() {
 // ─── Break Management ────────────────────────────────────────────────
 
 async function startBreak(data) {
-  await syncLecturePresence(); // Settle presence so banked study time is exact
+  await syncSessionActivity(); // Settle presence so banked study time is exact
   const session = await getSession();
   if (!session || session.state !== SESSION_STATES.ACTIVE) {
     return { error: 'No active session to break from' };
   }
 
-  // Accumulate study time so far (only on-lecture time counts as study)
-  if (session.onLecture) {
+  // Accumulate study time so far, then stop the study clock for the break.
+  if (session.counting) {
     session.totalStudyMs += Date.now() - session.lastActiveTimestamp;
   }
+  session.counting = false;
   session.state = SESSION_STATES.BREAK;
   session.breakStartTime = Date.now();
   session.breakDurationMinutes = data?.minutes || 5;
@@ -250,10 +259,11 @@ async function endBreak() {
     return { error: 'No break in progress' };
   }
 
-  // Accumulate break time
+  // Accumulate break time and resume the study clock (if still eligible).
   session.totalBreakMs += Date.now() - session.breakStartTime;
   session.state = SESSION_STATES.ACTIVE;
   session.lastActiveTimestamp = Date.now();
+  session.counting = session.onLecture !== false && session.windowFocused !== false;
   session.breakEndTime = null;
   session.breakStartTime = null;
   session.breakDurationMinutes = null;
@@ -663,7 +673,7 @@ async function handleEmergencyUnlockEnd() {
 }
 
 async function handleDistractionCheck() {
-  const session = await syncLecturePresence();
+  const session = await syncSessionActivity();
   if (!session || session.state !== SESSION_STATES.ACTIVE) return;
 
   // Only remind once per away period, and only while actually off the lecture.
@@ -690,7 +700,7 @@ async function handleDistractionCheck() {
 }
 
 async function handleSessionTick() {
-  await syncLecturePresence(); // Self-heal presence once a minute
+  await syncSessionActivity(); // Self-heal presence once a minute
   await updateBadge();
 }
 
@@ -741,35 +751,135 @@ async function isLectureOpen(session) {
   }
 }
 
-async function syncLecturePresence() {
+// ─── Clock Reconciliation (heartbeat) ────────────────────────────────
+// The minute tick stamps session.lastHeartbeat while the browser is alive.
+// If we wake up and the heartbeat is old — the browser was quit or the
+// machine slept mid-session — credit study time only up to the last
+// heartbeat plus one tick of grace, never the whole dead gap, then restart
+// counting from now.
+
+const HEARTBEAT_GAP_MS = 150000;  // >2.5 min of silence = the clock was dead
+const HEARTBEAT_GRACE_MS = 60000; // credit up to one tick past the last beat
+const HEARTBEAT_REFRESH_MS = 45000; // restamp when older than this
+
+// Mutates the session; returns true if it changed and needs saving.
+function reconcileSessionClock(session) {
+  if (!session || session.state !== SESSION_STATES.ACTIVE) return false;
+
+  const now = Date.now();
+
+  // First encounter (session predates heartbeats): stamp without banking,
+  // otherwise an in-flight session would lose its accrued time as a "gap".
+  if (!session.lastHeartbeat) {
+    session.lastHeartbeat = now;
+    return true;
+  }
+
+  const gap = now - session.lastHeartbeat;
+
+  if (gap > HEARTBEAT_GAP_MS) {
+    if (session.counting) {
+      const creditEnd = Math.min(now, session.lastHeartbeat + HEARTBEAT_GRACE_MS);
+      session.totalStudyMs += Math.max(0, creditEnd - session.lastActiveTimestamp);
+      session.lastActiveTimestamp = now;
+    }
+    session.lastHeartbeat = now;
+    return true;
+  }
+
+  if (gap > HEARTBEAT_REFRESH_MS) {
+    session.lastHeartbeat = now;
+    return true;
+  }
+
+  return false;
+}
+
+// True when Chrome currently holds OS focus (any window focused).
+async function isChromeFocused() {
+  try {
+    const win = await chrome.windows.getLastFocused();
+    return !!win && win.focused === true;
+  } catch {
+    return true; // Fail open — never freeze the timer on an API hiccup
+  }
+}
+
+// Recompute whether study time should be accruing and bank/resume across the
+// transition. Counting requires an active session, the lecture open in a tab,
+// AND Chrome focused — so time spent in other apps is never counted.
+function recomputeCounting(session) {
+  const should =
+    session.state === SESSION_STATES.ACTIVE &&
+    session.onLecture !== false &&
+    session.windowFocused !== false;
+  const now = Date.now();
+
+  if (should && !session.counting) {
+    session.counting = true;
+    session.lastActiveTimestamp = now;
+    return true;
+  }
+  if (!should && session.counting) {
+    session.totalStudyMs += now - session.lastActiveTimestamp;
+    session.counting = false;
+    return true;
+  }
+  return false;
+}
+
+// Single source of truth for live session state: reconciles the clock, window
+// focus, lecture presence, and the resulting counting flag, then persists and
+// broadcasts only if something actually changed.
+async function syncSessionActivity({ focused } = {}) {
   const session = await getSession();
   if (!session || session.state !== SESSION_STATES.ACTIVE) return session;
 
-  const open = await isLectureOpen(session);
-  if (open === !!session.onLecture) return session; // No transition
+  let changed = reconcileSessionClock(session);
 
-  if (open) {
-    // Back on the lecture — credit a recovery if a reminder had fired.
-    if (session.reminded) session.recoveredSessions++;
-    session.onLecture = true;
-    session.offLectureSince = null;
-    session.reminded = false;
-    session.lastActiveTimestamp = Date.now();
-  } else {
-    // Lecture closed everywhere — bank accrued study time and stop counting.
-    session.totalStudyMs += Date.now() - session.lastActiveTimestamp;
-    session.onLecture = false;
-    session.offLectureSince = Date.now();
+  // 1. Window focus — from the focus event when available, else queried live.
+  const isFocused = typeof focused === 'boolean' ? focused : await isChromeFocused();
+  if (session.windowFocused !== isFocused) {
+    session.windowFocused = isFocused;
+    changed = true;
   }
 
-  await saveSession(session);
-  broadcastToYouTubeTabs({ type: MSG.SESSION_UPDATED, data: session });
+  // 2. Lecture-page presence (drives distraction-recovery reminders).
+  const open = await isLectureOpen(session);
+  if (open !== !!session.onLecture) {
+    if (open) {
+      // Back on the lecture — credit a recovery if a reminder had fired.
+      if (session.reminded) session.recoveredSessions++;
+      session.onLecture = true;
+      session.offLectureSince = null;
+      session.reminded = false;
+    } else {
+      session.onLecture = false;
+      session.offLectureSince = Date.now();
+    }
+    changed = true;
+  }
+
+  // 3. Bank or resume the study clock based on the combined state.
+  if (recomputeCounting(session)) changed = true;
+
+  if (changed) {
+    await saveSession(session);
+    broadcastToYouTubeTabs({ type: MSG.SESSION_UPDATED, data: session });
+  }
   return session;
 }
 
 // A closed tab can take the lecture with it.
 chrome.tabs.onRemoved.addListener(() => {
-  syncLecturePresence().catch(() => {});
+  syncSessionActivity().catch(() => {});
+});
+
+// Chrome gaining/losing OS focus pauses or resumes the study clock.
+// WINDOW_ID_NONE means focus left Chrome entirely (another app, minimized).
+chrome.windows.onFocusChanged.addListener((windowId) => {
+  const focused = windowId !== chrome.windows.WINDOW_ID_NONE;
+  syncSessionActivity({ focused }).catch(() => {});
 });
 
 // ─── URL Monitoring (SPA Navigation) ─────────────────────────────────
@@ -789,7 +899,7 @@ async function handleYouTubeNavigation(details) {
   // from this single navigation event is wrong: a navigation in ANOTHER
   // YouTube tab would flip the flag off even though the lecture tab is
   // still open — and passive watching fires no event to flip it back.
-  await syncLecturePresence();
+  await syncSessionActivity();
 
   // Send page change event to content script
   try {
@@ -852,9 +962,9 @@ async function updateBadge() {
     return;
   }
 
-  // Show elapsed study time (the live portion only counts while on the lecture)
+  // Show elapsed study time (the live portion only counts while the clock runs)
   const elapsed = session.totalStudyMs +
-    (session.onLecture ? Date.now() - session.lastActiveTimestamp : 0);
+    (session.counting ? Date.now() - session.lastActiveTimestamp : 0);
   const minutes = Math.floor(elapsed / 60000);
   const text = minutes >= 60 ? `${Math.floor(minutes / 60)}h` : `${minutes}m`;
 

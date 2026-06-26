@@ -285,7 +285,7 @@
   function updateTimer(session) {
     let studyMs = session.totalStudyMs || 0;
 
-    if (session.state === 'active' && session.onLecture) {
+    if (session.state === 'active' && session.counting) {
       studyMs += Date.now() - session.lastActiveTimestamp;
     }
 

@@ -39,6 +39,13 @@ export async function getSession() {
     activeSession.offLectureSince = null;
     activeSession.reminded = false;
   }
+  // Migrate sessions created before the window-focus gate existed.
+  if (activeSession.windowFocused === undefined) {
+    activeSession.windowFocused = true;
+  }
+  if (activeSession.counting === undefined) {
+    activeSession.counting = activeSession.onLecture !== false && activeSession.windowFocused !== false;
+  }
   return activeSession;
 }
 
