@@ -47,8 +47,9 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 
 chrome.runtime.onStartup.addListener(async () => {
   // Settle the clock first: bank only up-to-heartbeat study time from before
-  // the browser was closed, then refresh presence and the badge.
-  await syncSessionActivity();
+  // the browser was closed, then refresh presence and the badge. Seed the
+  // focus state once here (the only place we query it).
+  await syncSessionActivity({ focused: await isChromeFocused() });
   await updateBadge();
   // Resume periodic alarms if a session is still active
   const session = await getSession();
@@ -856,10 +857,14 @@ async function syncSessionActivity({ focused } = {}) {
 
   let changed = reconcileSessionClock(session);
 
-  // 1. Window focus — from the focus event when available, else queried live.
-  const isFocused = typeof focused === 'boolean' ? focused : await isChromeFocused();
-  if (session.windowFocused !== isFocused) {
-    session.windowFocused = isFocused;
+  // 1. Window focus is EVENT-DRIVEN only (onFocusChanged / tab activation /
+  //    navigation / popup). Passive syncs pass no `focused` and must NOT
+  //    re-query it: getLastFocused() can return a false negative that would
+  //    stick windowFocused=false with no event to flip it back during passive
+  //    watching. Leaving it untouched means the worst case is over-counting a
+  //    little, never a clock frozen forever.
+  if (typeof focused === 'boolean' && session.windowFocused !== focused) {
+    session.windowFocused = focused;
     changed = true;
   }
 
@@ -894,6 +899,13 @@ chrome.tabs.onRemoved.addListener(() => {
   syncSessionActivity().catch(() => {});
 });
 
+// Switching tabs proves the user is in Chrome — a guaranteed resume path that
+// also refreshes lecture presence (e.g. flipping back to the lecture tab, or
+// away to LeetCode while the lecture stays open).
+chrome.tabs.onActivated.addListener(() => {
+  syncSessionActivity({ focused: true }).catch(() => {});
+});
+
 // Chrome gaining/losing OS focus pauses or resumes the study clock.
 // WINDOW_ID_NONE means focus left Chrome entirely (another app, minimized).
 chrome.windows.onFocusChanged.addListener((windowId) => {
@@ -914,11 +926,10 @@ async function handleYouTubeNavigation(details) {
 
   const pageType = getPageType(details.url);
 
-  // Re-derive lecture presence from the actual set of open tabs. Deciding
-  // from this single navigation event is wrong: a navigation in ANOTHER
-  // YouTube tab would flip the flag off even though the lecture tab is
-  // still open — and passive watching fires no event to flip it back.
-  await syncSessionActivity();
+  // A navigation means the user is acting in Chrome, so assert focus (this is
+  // one of the guaranteed resume paths). Lecture presence is re-derived from
+  // the live tab list inside syncSessionActivity.
+  await syncSessionActivity({ focused: true });
 
   // Send page change event to content script
   try {
