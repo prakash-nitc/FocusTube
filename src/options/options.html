@@ -107,19 +107,35 @@
         <div class="options__grid">
           <div class="options__num-field">
             <label class="options__inline-label" for="focus-minutes">Focus (min)</label>
-            <input type="number" min="1" max="180" class="options__input options__input--num" id="focus-minutes">
+            <div class="options__stepper">
+              <button type="button" class="options__step" data-target="focus-minutes" data-step="-5" aria-label="Decrease focus minutes">−</button>
+              <input type="number" min="1" max="180" class="options__input options__input--num" id="focus-minutes">
+              <button type="button" class="options__step" data-target="focus-minutes" data-step="5" aria-label="Increase focus minutes">+</button>
+            </div>
           </div>
           <div class="options__num-field">
             <label class="options__inline-label" for="short-break-minutes">Short break (min)</label>
-            <input type="number" min="1" max="60" class="options__input options__input--num" id="short-break-minutes">
+            <div class="options__stepper">
+              <button type="button" class="options__step" data-target="short-break-minutes" data-step="-1" aria-label="Decrease short break">−</button>
+              <input type="number" min="1" max="60" class="options__input options__input--num" id="short-break-minutes">
+              <button type="button" class="options__step" data-target="short-break-minutes" data-step="1" aria-label="Increase short break">+</button>
+            </div>
           </div>
           <div class="options__num-field">
             <label class="options__inline-label" for="long-break-minutes">Long break (min)</label>
-            <input type="number" min="1" max="90" class="options__input options__input--num" id="long-break-minutes">
+            <div class="options__stepper">
+              <button type="button" class="options__step" data-target="long-break-minutes" data-step="-5" aria-label="Decrease long break">−</button>
+              <input type="number" min="1" max="90" class="options__input options__input--num" id="long-break-minutes">
+              <button type="button" class="options__step" data-target="long-break-minutes" data-step="5" aria-label="Increase long break">+</button>
+            </div>
           </div>
           <div class="options__num-field">
             <label class="options__inline-label" for="cycles-before-long">Sessions before long break</label>
-            <input type="number" min="1" max="12" class="options__input options__input--num" id="cycles-before-long">
+            <div class="options__stepper">
+              <button type="button" class="options__step" data-target="cycles-before-long" data-step="-1" aria-label="Decrease sessions">−</button>
+              <input type="number" min="1" max="12" class="options__input options__input--num" id="cycles-before-long">
+              <button type="button" class="options__step" data-target="cycles-before-long" data-step="1" aria-label="Increase sessions">+</button>
+            </div>
           </div>
         </div>
 

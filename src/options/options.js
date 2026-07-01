@@ -98,6 +98,21 @@
       });
     });
 
+    // − / + stepper buttons on the number fields
+    $$('.options__step').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const input = document.getElementById(btn.dataset.target);
+        if (!input) return;
+        const step = parseInt(btn.dataset.step, 10) || 1;
+        const min = parseInt(input.min, 10);
+        const max = parseInt(input.max, 10);
+        let val = (parseInt(input.value, 10) || 0) + step;
+        if (Number.isFinite(min)) val = Math.max(min, val);
+        if (Number.isFinite(max)) val = Math.min(max, val);
+        input.value = String(val);
+      });
+    });
+
     // Test the selected alarm sound
     $('#test-sound').addEventListener('click', () => {
       const sound = $('#alarm-sound').value;
