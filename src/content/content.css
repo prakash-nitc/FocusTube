@@ -15,8 +15,17 @@ body.focustube-hide-sidebar ytd-mini-guide-renderer {
   display: none !important;
 }
 
-body.focustube-hide-recommendations #secondary,
-body.focustube-hide-recommendations #related {
+/* Hide the recommended/related videos, but NOT the whole sidebar — YouTube's
+   engagement panels (Ask/Gemini, Transcript, Chapters) render inside #secondary
+   and must stay reachable. */
+body.focustube-hide-recommendations #related,
+body.focustube-hide-recommendations ytd-watch-next-secondary-results-renderer {
+  display: none !important;
+}
+
+/* Collapse the now-empty sidebar for a clean full-width player, but reveal it
+   the moment an engagement panel (e.g. Ask) is expanded. */
+body.focustube-hide-recommendations #secondary:not(:has(ytd-engagement-panel-section-list-renderer[visibility="ENGAGEMENT_PANEL_VISIBILITY_EXPANDED"])) {
   display: none !important;
 }
 
