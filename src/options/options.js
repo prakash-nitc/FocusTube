@@ -69,6 +69,7 @@
     $('#long-break-minutes').value = String(s.pomodoroLongBreakMinutes);
     $('#cycles-before-long').value = String(s.pomodoroCyclesBeforeLongBreak);
     $('#toggle-autostart').checked = s.pomodoroAutoStartNext;
+    highlightMatchingPreset(s.pomodoroFocusMinutes, s.pomodoroShortBreakMinutes, s.pomodoroLongBreakMinutes);
     $('#alarm-sound').value = s.pomodoroAlarmSound;
     $('#alarm-volume').value = String(Math.round((s.pomodoroAlarmVolume ?? 0.7) * 100));
 
@@ -98,6 +99,11 @@
       });
     });
 
+    // Keep the active preset in sync when fields are edited by hand or steppers
+    ['#focus-minutes', '#short-break-minutes', '#long-break-minutes'].forEach(sel => {
+      $(sel).addEventListener('input', syncActivePresetFromFields);
+    });
+
     // − / + stepper buttons on the number fields
     $$('.options__step').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -110,6 +116,7 @@
         if (Number.isFinite(min)) val = Math.max(min, val);
         if (Number.isFinite(max)) val = Math.min(max, val);
         input.value = String(val);
+        syncActivePresetFromFields();
       });
     });
 
@@ -166,6 +173,23 @@
     setTimeout(() => {
       status.classList.remove('options__save-status--visible');
     }, 2000);
+  }
+
+  // Highlight the preset whose durations match the given values (if any).
+  function highlightMatchingPreset(focus, short, long) {
+    $$('.options__preset').forEach(btn => {
+      const p = PRESETS[btn.dataset.preset];
+      const match = p && p.focus === focus && p.shortBreak === short && p.longBreak === long;
+      btn.classList.toggle('options__preset--active', !!match);
+    });
+  }
+
+  function syncActivePresetFromFields() {
+    highlightMatchingPreset(
+      parseInt($('#focus-minutes').value, 10),
+      parseInt($('#short-break-minutes').value, 10),
+      parseInt($('#long-break-minutes').value, 10),
+    );
   }
 
   // ─── Alarm Tone Preview (matches the offscreen player) ──────────────

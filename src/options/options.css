@@ -173,14 +173,6 @@ body {
 .options__pomodoro-presets {
   display: flex;
   gap: 10px;
-  opacity: 0.4;
-  pointer-events: none;
-  transition: opacity 0.3s ease;
-}
-
-.options__pomodoro-presets--active {
-  opacity: 1;
-  pointer-events: auto;
 }
 
 .options__preset {
@@ -194,6 +186,13 @@ body {
   text-align: center;
   transition: all 0.2s ease;
   font-family: inherit;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.options__preset:active {
+  transform: scale(0.97);
+  background: rgba(167, 139, 250, 0.14);
 }
 
 .options__preset strong {
